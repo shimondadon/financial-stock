@@ -92,12 +92,11 @@ app.post('/api/financials', async (req, res) => {
             const cachedData = JSON.parse(fs.readFileSync(cachedFilePath, 'utf8'));
             const filename = path.basename(cachedFilePath);
 
-            // Send cached file as download
+            // Send cached data as JSON (not as download)
             res.setHeader('Content-Type', 'application/json');
-            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-            res.send(JSON.stringify(cachedData, null, 2));
+            res.json(cachedData);
 
-            console.log(`✅ Successfully sent cached file: ${filename}\n`);
+            console.log(`✅ Successfully sent cached data: ${filename}\n`);
             return;
         }
 
@@ -114,12 +113,11 @@ app.post('/api/financials', async (req, res) => {
         // Save to cache
         const { filename } = saveToCache(upperSymbol, data);
 
-        // Send file as download
+        // Send data as JSON (not as download)
         res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.send(JSON.stringify(data, null, 2));
+        res.json(data);
 
-        console.log(`✅ Successfully sent ${filename} to client\n`);
+        console.log(`✅ Successfully sent fresh data: ${filename}\n`);
 
     } catch (error) {
         console.error('Server error:', error);

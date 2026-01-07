@@ -16,6 +16,7 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             padding: 20px;
@@ -171,6 +172,256 @@
             background: #667eea;
             color: white;
         }
+
+        /* Results Section */
+        .results-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 1200px;
+            width: 100%;
+            margin-top: 30px;
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 15px;
+        }
+
+        .results-header h2 {
+            color: #333;
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .close-btn {
+            background: #ff5252;
+            color: white;
+            border: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            transition: transform 0.2s ease;
+        }
+
+        .close-btn:hover {
+            transform: rotate(90deg);
+            background: #ff1744;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-left: 4px solid #667eea;
+            padding-left: 12px;
+        }
+
+        .company-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-item label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .info-item value {
+            font-size: 16px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .metric-card label {
+            font-size: 13px;
+            opacity: 0.95;
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .metric-card value {
+            font-size: 26px;
+            font-weight: bold;
+            display: block;
+        }
+
+        /* Year Selector */
+        .year-selector-container {
+            margin: 20px 0;
+        }
+
+        .year-selector {
+            width: 100%;
+            max-width: 300px;
+            padding: 15px 20px;
+            font-size: 18px;
+            font-weight: 600;
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        .year-selector:hover {
+            border-color: #764ba2;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .year-selector:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2);
+        }
+
+        .year-selector option {
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .data-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .data-table th {
+            padding: 16px 15px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .data-table td {
+            padding: 14px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .data-table td:first-child {
+            font-weight: 600;
+            color: #444;
+        }
+
+        .data-table tbody tr {
+            transition: background 0.2s ease;
+        }
+
+        .data-table tbody tr:hover {
+            background: #f0f0ff;
+        }
+
+        .data-table tbody tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .data-table tbody tr:nth-child(even):hover {
+            background: #f0f0ff;
+        }
+
+        .positive {
+            color: #2e7d32;
+            font-weight: 700;
+        }
+
+        .negative {
+            color: #c62828;
+            font-weight: 700;
+        }
+
+        .download-section {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .download-json-btn {
+            padding: 14px 30px;
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .download-json-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
+        }
     </style>
 </head>
 <body>
@@ -210,11 +461,46 @@
         </div>
     </div>
 
+    <!-- Results Section -->
+    <div id="resultsContainer" class="results-container" style="display: none;">
+        <div class="results-header">
+            <h2 id="resultsTitle">📊 Financial Data</h2>
+            <button onclick="closeResults()" class="close-btn">✕</button>
+        </div>
+
+        <!-- Company Overview -->
+        <div id="companyOverview" class="section"></div>
+
+        <!-- Latest Metrics Summary -->
+        <div id="metricsSummary" class="section"></div>
+
+        <!-- Year Selector -->
+        <div class="section">
+            <h3>📅 Select Year</h3>
+            <div class="year-selector-container">
+                <select id="yearSelector" class="year-selector" onchange="updateYearData()">
+                    <option value="">Select a year...</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Financial Data Tables (updated based on year selection) -->
+        <div id="financialTables" class="section"></div>
+
+        <!-- Download Button -->
+        <div class="download-section">
+            <button id="downloadBtn" onclick="downloadJSON()" class="download-json-btn">
+                💾 Download Full JSON Report
+            </button>
+        </div>
+    </div>
+
     <script>
         const form = document.getElementById('financialForm');
         const submitBtn = document.getElementById('submitBtn');
         const statusDiv = document.getElementById('status');
         const symbolInput = document.getElementById('symbol');
+        let currentData = null;
 
         function setSymbol(symbol) {
             symbolInput.value = symbol;
@@ -229,6 +515,270 @@
 
         function hideStatus() {
             statusDiv.style.display = 'none';
+        }
+
+        function closeResults() {
+            document.getElementById('resultsContainer').style.display = 'none';
+        }
+
+        function formatNumber(value, decimals = 2) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+            return Number(value).toFixed(decimals);
+        }
+
+        function formatCurrency(value, inBillions = true) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+            if (inBillions) {
+                return `$${(value / 1e9).toFixed(2)}B`;
+            }
+            return `$${Number(value).toLocaleString()}`;
+        }
+
+        function formatPercent(value) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+            const formatted = formatNumber(value, 2) + '%';
+            const className = value >= 0 ? 'positive' : 'negative';
+            return `<span class="${className}">${formatted}</span>`;
+        }
+
+        function displayCompanyOverview(data) {
+            const overview = data.companyOverview;
+            const html = `
+                <h3>🏢 Company Overview</h3>
+                <div class="company-info">
+                    <div class="info-item">
+                        <label>Symbol</label>
+                        <value>${data.symbol}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Name</label>
+                        <value>${overview.Name || 'N/A'}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Exchange</label>
+                        <value>${overview.Exchange || 'N/A'}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Sector</label>
+                        <value>${overview.Sector || 'N/A'}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Industry</label>
+                        <value>${overview.Industry || 'N/A'}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Market Cap</label>
+                        <value>${overview.MarketCapitalization ? formatCurrency(overview.MarketCapitalization) : 'N/A'}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>P/E Ratio</label>
+                        <value>${overview.PERatio || 'N/A'}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Dividend Yield</label>
+                        <value>${overview.DividendYield ? (parseFloat(overview.DividendYield) * 100).toFixed(2) + '%' : 'N/A'}</value>
+                    </div>
+                </div>
+            `;
+            document.getElementById('companyOverview').innerHTML = html;
+        }
+
+        function displayMetricsSummary(data) {
+            if (!data.enhancedReports || data.enhancedReports.length === 0) {
+                document.getElementById('metricsSummary').innerHTML = '<p>No financial data available</p>';
+                return;
+            }
+
+            // Find the latest year (newest/highest year number)
+            const latestReport = data.enhancedReports.reduce((latest, current) => {
+                return parseInt(current.year) > parseInt(latest.year) ? current : latest;
+            });
+
+            const metrics = latestReport.calculatedMetrics;
+
+            const html = `
+                <h3>📈 Latest Financial Metrics (${latestReport.year})</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <label>Net Profit Margin</label>
+                        <value>${formatNumber(metrics.netProfitMargin)}%</value>
+                    </div>
+                    <div class="metric-card">
+                        <label>ROE</label>
+                        <value>${formatNumber(metrics.returnOnEquity)}%</value>
+                    </div>
+                    <div class="metric-card">
+                        <label>ROA</label>
+                        <value>${formatNumber(metrics.returnOnAssets)}%</value>
+                    </div>
+                    <div class="metric-card">
+                        <label>Current Ratio</label>
+                        <value>${formatNumber(metrics.currentRatio)}</value>
+                    </div>
+                    <div class="metric-card">
+                        <label>Debt-to-Equity</label>
+                        <value>${formatNumber(metrics.debtToEquity)}</value>
+                    </div>
+                    <div class="metric-card">
+                        <label>Revenue Growth</label>
+                        <value>${formatNumber(metrics.revenueGrowth)}%</value>
+                    </div>
+                </div>
+            `;
+            document.getElementById('metricsSummary').innerHTML = html;
+        }
+
+        function displayYearlyTables(data) {
+            if (!data.enhancedReports || data.enhancedReports.length === 0) {
+                document.getElementById('financialTables').innerHTML = '<p>No yearly data available</p>';
+                return;
+            }
+
+            // Populate year selector (in descending order - newest to oldest)
+            const yearSelector = document.getElementById('yearSelector');
+            yearSelector.innerHTML = '<option value="">Select a year...</option>';
+
+            // Sort reports by year in descending order
+            const sortedReports = [...data.enhancedReports].sort((a, b) => {
+                return parseInt(b.year) - parseInt(a.year);
+            });
+
+            sortedReports.forEach((report, sortedIndex) => {
+                // Find the original index in data.enhancedReports
+                const originalIndex = data.enhancedReports.findIndex(r => r.year === report.year);
+
+                const option = document.createElement('option');
+                option.value = originalIndex;
+                option.textContent = report.year;
+                if (sortedIndex === 0) option.selected = true;
+                yearSelector.appendChild(option);
+            });
+
+            // Display first year (newest) by default
+            updateYearData();
+        }
+
+        function updateYearData() {
+            if (!currentData || !currentData.enhancedReports) return;
+
+            const yearSelector = document.getElementById('yearSelector');
+            const selectedIndex = yearSelector.value;
+
+            if (selectedIndex === '') {
+                document.getElementById('financialTables').innerHTML = '<p style="text-align: center; color: #666; padding: 30px;">Please select a year to view financial data</p>';
+                return;
+            }
+
+            const report = currentData.enhancedReports[selectedIndex];
+            const year = report.year;
+            const income = report.incomeStatement;
+            const balance = report.balanceSheet;
+            const cashFlow = report.cashFlow;
+            const metrics = report.calculatedMetrics;
+
+            const html = `
+                <h3>📊 Financial Data for Year ${year}</h3>
+
+                <div style="margin-bottom: 30px;">
+                    <h4 style="color: #667eea; margin-bottom: 15px; font-size: 18px; border-left: 4px solid #667eea; padding-left: 12px;">
+                        💰 Income Statement
+                    </h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Item</th><th>Value (USD)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Total Revenue</td><td>${formatCurrency(income.totalRevenue)}</td></tr>
+                            <tr><td>Gross Profit</td><td>${formatCurrency(income.grossProfit)}</td></tr>
+                            <tr><td>Operating Income</td><td>${formatCurrency(income.operatingIncome)}</td></tr>
+                            <tr><td>Net Income</td><td>${formatCurrency(income.netIncome)}</td></tr>
+                            <tr><td>EBITDA</td><td>${formatCurrency(income.ebitda)}</td></tr>
+                            <tr><td>EPS</td><td>$${formatNumber(report.earnings.reportedEPS, 2)}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-bottom: 30px;">
+                    <h4 style="color: #667eea; margin-bottom: 15px; font-size: 18px; border-left: 4px solid #667eea; padding-left: 12px;">
+                        🏦 Balance Sheet
+                    </h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Item</th><th>Value (USD)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Total Assets</td><td>${formatCurrency(balance.totalAssets)}</td></tr>
+                            <tr><td>Current Assets</td><td>${formatCurrency(balance.totalCurrentAssets)}</td></tr>
+                            <tr><td>Total Liabilities</td><td>${formatCurrency(balance.totalLiabilities)}</td></tr>
+                            <tr><td>Current Liabilities</td><td>${formatCurrency(balance.totalCurrentLiabilities)}</td></tr>
+                            <tr><td>Long Term Debt</td><td>${formatCurrency(balance.longTermDebt)}</td></tr>
+                            <tr><td>Shareholder Equity</td><td>${formatCurrency(balance.totalShareholderEquity)}</td></tr>
+                            <tr><td>Cash & Equivalents</td><td>${formatCurrency(balance.cashAndCashEquivalentsAtCarryingValue)}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-bottom: 30px;">
+                    <h4 style="color: #667eea; margin-bottom: 15px; font-size: 18px; border-left: 4px solid #667eea; padding-left: 12px;">
+                        💵 Cash Flow Statement
+                    </h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Item</th><th>Value (USD)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Operating Cash Flow</td><td>${formatCurrency(cashFlow.operatingCashflow)}</td></tr>
+                            <tr><td>Capital Expenditures</td><td>${formatCurrency(cashFlow.capitalExpenditures)}</td></tr>
+                            <tr><td>Free Cash Flow</td><td>${formatCurrency(metrics.freeCashFlow)}</td></tr>
+                            <tr><td>Investing Cash Flow</td><td>${formatCurrency(cashFlow.cashflowFromInvestment)}</td></tr>
+                            <tr><td>Financing Cash Flow</td><td>${formatCurrency(cashFlow.cashflowFromFinancing)}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-bottom: 30px;">
+                    <h4 style="color: #667eea; margin-bottom: 15px; font-size: 18px; border-left: 4px solid #667eea; padding-left: 12px;">
+                        📊 Calculated Financial Metrics
+                    </h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Metric</th><th>Value</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Gross Profit Margin</td><td>${formatPercent(metrics.grossProfitMargin)}</td></tr>
+                            <tr><td>Operating Margin</td><td>${formatPercent(metrics.operatingMargin)}</td></tr>
+                            <tr><td>Net Profit Margin</td><td>${formatPercent(metrics.netProfitMargin)}</td></tr>
+                            <tr><td>Return on Assets (ROA)</td><td>${formatPercent(metrics.returnOnAssets)}</td></tr>
+                            <tr><td>Return on Equity (ROE)</td><td>${formatPercent(metrics.returnOnEquity)}</td></tr>
+                            <tr><td>EBITDA Margin</td><td>${formatPercent(metrics.ebitdaMargin)}</td></tr>
+                            <tr><td>Current Ratio</td><td>${formatNumber(metrics.currentRatio)}</td></tr>
+                            <tr><td>Quick Ratio</td><td>${formatNumber(metrics.quickRatio)}</td></tr>
+                            <tr><td>Debt-to-Equity</td><td>${formatNumber(metrics.debtToEquity)}</td></tr>
+                            <tr><td>Debt-to-Assets</td><td>${formatNumber(metrics.debtToAssets)}</td></tr>
+                            <tr><td>Asset Turnover</td><td>${formatNumber(metrics.assetTurnover)}</td></tr>
+                            <tr><td>Revenue Growth (YoY)</td><td>${formatPercent(metrics.revenueGrowth)}</td></tr>
+                            <tr><td>Net Income Growth (YoY)</td><td>${formatPercent(metrics.netIncomeGrowth)}</td></tr>
+                            <tr><td>EPS Growth (YoY)</td><td>${formatPercent(metrics.epsGrowth)}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            document.getElementById('financialTables').innerHTML = html;
+        }
+
+        function downloadJSON() {
+            if (!currentData) return;
+
+            const blob = new Blob([JSON.stringify(currentData, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `financial_${currentData.symbol}_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
         }
 
         form.addEventListener('submit', async (e) => {
@@ -272,28 +822,26 @@
                 }
 
                 const responseTime = Date.now() - startTime;
-                const isCached = responseTime < 5000; // If response is faster than 5 seconds, it's cached
+                const isCached = responseTime < 5000;
 
-                // Get the filename from the response header
-                const contentDisposition = response.headers.get('Content-Disposition');
-                const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
-                const filename = filenameMatch ? filenameMatch[1] : `financial_${symbol}.json`;
+                // Parse JSON data
+                const data = await response.json();
+                currentData = data;
 
-                // Download the file
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
+                // Display data in tables
+                document.getElementById('resultsTitle').textContent = `📊 Financial Data - ${symbol}`;
+                displayCompanyOverview(data);
+                displayMetricsSummary(data);
+                displayYearlyTables(data);
+
+                // Show results
+                document.getElementById('resultsContainer').style.display = 'block';
+                document.getElementById('resultsContainer').scrollIntoView({ behavior: 'smooth' });
 
                 if (isCached) {
-                    showStatus(`✅ Success! Downloaded ${filename} (from today's cache)`, 'success');
+                    showStatus(`✅ Success! Data loaded from today's cache`, 'success');
                 } else {
-                    showStatus(`✅ Success! Downloaded ${filename} (fresh from API)`, 'success');
+                    showStatus(`✅ Success! Fresh data fetched from API`, 'success');
                 }
 
             } catch (error) {
