@@ -162,4 +162,3 @@ The downloaded JSON file contains:
 ## License
 
 ISC
-
