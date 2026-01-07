@@ -11,15 +11,22 @@
             box-sizing: border-box;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-attachment: fixed;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             padding: 20px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .container {
@@ -183,6 +190,8 @@
             width: 100%;
             margin-top: 30px;
             animation: slideIn 0.5s ease;
+            contain: layout style paint;
+            transform: translateZ(0);
         }
 
         @keyframes slideIn {
@@ -280,6 +289,8 @@
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             transition: transform 0.2s ease;
+            will-change: transform;
+            backface-visibility: hidden;
         }
 
         .metric-card:hover {
@@ -375,6 +386,7 @@
 
         .data-table tbody tr {
             transition: background 0.2s ease;
+            will-change: background;
         }
 
         .data-table tbody tr:hover {
