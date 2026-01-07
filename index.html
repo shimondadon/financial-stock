@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha Vantage Financial Data Fetcher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #90caf9;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border: 1px solid #81c784;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #d32f2f;
+            border: 1px solid #ef5350;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .examples {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+
+        .examples strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .examples span {
+            display: inline-block;
+            background: white;
+            padding: 4px 8px;
+            border-radius: 5px;
+            margin: 2px;
+            color: #667eea;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .examples span:hover {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Financial Data Fetcher</h1>
+        <p class="subtitle">Get comprehensive financial statements with calculated metrics</p>
+
+        <form id="financialForm">
+            <div class="form-group">
+                <label for="symbol">Stock Symbol</label>
+                <input
+                    type="text"
+                    id="symbol"
+                    name="symbol"
+                    placeholder="Enter symbol (e.g., AAPL, MSFT)"
+                    required
+                    pattern="[A-Za-z]+"
+                    maxlength="10"
+                    autocomplete="off"
+                >
+            </div>
+
+            <button type="submit" id="submitBtn">
+                Fetch Financial Data
+            </button>
+        </form>
+
+        <div id="status" class="status"></div>
+
+        <div class="examples">
+            <strong>Example Symbols:</strong>
+            <span onclick="setSymbol('AAPL')">AAPL</span>
+            <span onclick="setSymbol('MSFT')">MSFT</span>
+            <span onclick="setSymbol('IBM')">IBM</span>
+            <span onclick="setSymbol('CRM')">CRM</span>
+            <span onclick="setSymbol('GOOGL')">GOOGL</span>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('financialForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusDiv = document.getElementById('status');
+        const symbolInput = document.getElementById('symbol');
+
+        function setSymbol(symbol) {
+            symbolInput.value = symbol;
+            symbolInput.focus();
+        }
+
+        function showStatus(message, type = 'info') {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+
+        function hideStatus() {
+            statusDiv.style.display = 'none';
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const symbol = symbolInput.value.trim().toUpperCase();
+
+            if (!symbol) {
+                showStatus('Please enter a stock symbol', 'error');
+                return;
+            }
+
+            // Disable form
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner"></span>Fetching data...';
+            hideStatus();
+
+            try {
+                showStatus('⏳ Checking for cached data...', 'info');
+
+                const startTime = Date.now();
+
+                // Set a timeout to update message if taking longer (means fetching from API)
+                const progressTimeout = setTimeout(() => {
+                    showStatus('⏳ Fetching fresh data from API... This will take 60-90 seconds due to rate limits.', 'info');
+                }, 3000);
+
+                const response = await fetch('/api/financials', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ symbol })
+                });
+
+                clearTimeout(progressTimeout);
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to fetch data');
+                }
+
+                const responseTime = Date.now() - startTime;
+                const isCached = responseTime < 5000; // If response is faster than 5 seconds, it's cached
+
+                // Get the filename from the response header
+                const contentDisposition = response.headers.get('Content-Disposition');
+                const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
+                const filename = filenameMatch ? filenameMatch[1] : `financial_${symbol}.json`;
+
+                // Download the file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                if (isCached) {
+                    showStatus(`✅ Success! Downloaded ${filename} (from today's cache)`, 'success');
+                } else {
+                    showStatus(`✅ Success! Downloaded ${filename} (fresh from API)`, 'success');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            } finally {
+                // Re-enable form
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Fetch Financial Data';
+            }
+        });
+
+        // Auto-capitalize input
+        symbolInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,27 @@
+{
+  "name": "alphavantage-enhanced",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "alphavantage_enhanced.js",
+  "scripts": {
+    "start": "node server.js",
+    "cli": "node alphavantage_enhanced.js"
+  },
+  "keywords": [
+    "alphavantage",
+    "financial",
+    "api",
+    "stocks",
+    "financial-data"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "Enhanced financial data fetcher from Alpha Vantage API with calculated metrics",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
+  }
+}
