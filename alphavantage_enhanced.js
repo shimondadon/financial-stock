@@ -176,46 +176,62 @@ function checkForErrors(data) {
 }
 
 /**
- * חילוץ דוחות שנתיים ושנים זמינות
+ * חילוץ דוחות (שנתיים או רבעוניים) ותקופות זמינות
  * @param {Object} data - אובייקט עם כל הנתונים
- * @returns {Object} - דוחות ושנים זמינות
+ * @param {string} reportType - 'annual' או 'quarterly'
+ * @returns {Object} - דוחות ותקופות זמינות
  */
-function extractReportsAndYears(data) {
+function extractReportsAndYears(data, reportType = 'annual') {
     const { incomeData, balanceData, cashFlowData, earningsData } = data;
 
-    const incomeReports = incomeData.annualReports || [];
-    const balanceReports = balanceData.annualReports || [];
-    const cashFlowReports = cashFlowData.annualReports || [];
-    const earningsReports = earningsData.annualEarnings || [];
+    // בחירת סוג הדוחות (שנתי או רבעוני)
+    const isAnnual = reportType === 'annual';
+    const reportsKey = isAnnual ? 'annualReports' : 'quarterlyReports';
+    const earningsKey = isAnnual ? 'annualEarnings' : 'quarterlyEarnings';
 
-    const incomeYears = incomeReports.map(r => r.fiscalDateEnding?.substring(0, 4));
-    const balanceYears = balanceReports.map(r => r.fiscalDateEnding?.substring(0, 4));
-    const cashFlowYears = cashFlowReports.map(r => r.fiscalDateEnding?.substring(0, 4));
-    const earningsYears = earningsReports.map(r => r.fiscalDateEnding?.substring(0, 4));
+    const incomeReports = incomeData[reportsKey] || [];
+    const balanceReports = balanceData[reportsKey] || [];
+    const cashFlowReports = cashFlowData[reportsKey] || [];
+    const earningsReports = earningsData[earningsKey] || [];
 
-    const years = [...new Set([...incomeYears, ...balanceYears, ...cashFlowYears, ...earningsYears])].sort();
+    // עבור דוחות רבעוניים, נשתמש בתאריך המלא (YYYY-MM-DD)
+    // עבור דוחות שנתיים, רק השנה (YYYY)
+    const extractPeriod = (dateStr) => {
+        if (!dateStr) return null;
+        return isAnnual ? dateStr.substring(0, 4) : dateStr;
+    };
+
+    const incomePeriods = incomeReports.map(r => extractPeriod(r.fiscalDateEnding)).filter(Boolean);
+    const balancePeriods = balanceReports.map(r => extractPeriod(r.fiscalDateEnding)).filter(Boolean);
+    const cashFlowPeriods = cashFlowReports.map(r => extractPeriod(r.fiscalDateEnding)).filter(Boolean);
+    const earningsPeriods = earningsReports.map(r => extractPeriod(r.fiscalDateEnding)).filter(Boolean);
+
+    const periods = [...new Set([...incomePeriods, ...balancePeriods, ...cashFlowPeriods, ...earningsPeriods])].sort().reverse();
 
     // הדפסת סיכום
-    console.log('\n=== Available Years ===');
-    console.log(`Income Statement: ${incomeReports.length} years`);
-    console.log(`Balance Sheet: ${balanceReports.length} years`);
-    console.log(`Cash Flow: ${cashFlowReports.length} years`);
-    console.log(`Earnings: ${earningsReports.length} years`);
-    console.log(`Income years: ${incomeYears.join(', ')}`);
-    console.log(`Balance years: ${balanceYears.join(', ')}`);
-    console.log(`Cash Flow years: ${cashFlowYears.join(', ')}`);
-    console.log(`Earnings years: ${earningsYears.join(', ')}`);
+    console.log(`\n=== Available ${isAnnual ? 'Years' : 'Quarters'} (${reportType.toUpperCase()}) ===`);
+    console.log(`Income Statement: ${incomeReports.length} ${isAnnual ? 'years' : 'quarters'}`);
+    console.log(`Balance Sheet: ${balanceReports.length} ${isAnnual ? 'years' : 'quarters'}`);
+    console.log(`Cash Flow: ${cashFlowReports.length} ${isAnnual ? 'years' : 'quarters'}`);
+    console.log(`Earnings: ${earningsReports.length} ${isAnnual ? 'years' : 'quarters'}`);
 
     return {
+        reportType,
         incomeReports,
         balanceReports,
         cashFlowReports,
         earningsReports,
-        incomeYears,
-        balanceYears,
-        cashFlowYears,
-        earningsYears,
-        years
+        incomePeriods,
+        balancePeriods,
+        cashFlowPeriods,
+        earningsPeriods,
+        periods,
+        // שמירת שמות ישנים לתאימות לאחור
+        incomeYears: incomePeriods,
+        balanceYears: balancePeriods,
+        cashFlowYears: cashFlowPeriods,
+        earningsYears: earningsPeriods,
+        years: periods
     };
 }
 
@@ -292,22 +308,33 @@ function calculateFinancialMetrics(income, balance, cashFlow, earnings) {
 }
 
 /**
- * יצירת דוחות משופרים עם מדדים מחושבים לכל שנה
- * @param {Object} reportsData - כל הדוחות והשנים
+ * יצירת דוחות משופרים עם מדדים מחושבים
+ * @param {Object} reportsData - כל הדוחות והתקופות
  * @returns {Array} - מערך של דוחות משופרים
  */
 function createEnhancedReports(reportsData) {
-    const { years, incomeReports, balanceReports, cashFlowReports, earningsReports } = reportsData;
+    const { periods, incomeReports, balanceReports, cashFlowReports, earningsReports, reportType } = reportsData;
+    const isAnnual = reportType === 'annual';
 
-    const enhancedReports = years.map(year => {
-        const income = incomeReports.find(r => r.fiscalDateEnding?.startsWith(year)) || {};
-        const balance = balanceReports.find(r => r.fiscalDateEnding?.startsWith(year)) || {};
-        const cashFlow = cashFlowReports.find(r => r.fiscalDateEnding?.startsWith(year)) || {};
-        const earnings = earningsReports.find(r => r.fiscalDateEnding?.startsWith(year)) || {};
+    const enhancedReports = periods.map(period => {
+        // מציאת דוחות לפי תקופה (שנה או רבעון)
+        const matchPeriod = (report) => {
+            if (!report.fiscalDateEnding) return false;
+            return isAnnual ?
+                report.fiscalDateEnding.startsWith(period) :
+                report.fiscalDateEnding === period;
+        };
+
+        const income = incomeReports.find(matchPeriod) || {};
+        const balance = balanceReports.find(matchPeriod) || {};
+        const cashFlow = cashFlowReports.find(matchPeriod) || {};
+        const earnings = earningsReports.find(matchPeriod) || {};
 
         return {
-            year,
+            period,  // יכול להיות שנה (2024) או תאריך מלא (2024-12-31)
+            year: isAnnual ? period : period.substring(0, 4),  // תמיד שנה
             fiscalDateEnding: income.fiscalDateEnding || balance.fiscalDateEnding || cashFlow.fiscalDateEnding,
+            reportType,
             incomeStatement: income,
             balanceSheet: balance,
             cashFlow: cashFlow,
@@ -324,9 +351,9 @@ function createEnhancedReports(reportsData) {
  * @param {Array} enhancedReports - מערך הדוחות המשופרים
  */
 function calculateGrowthMetrics(enhancedReports) {
-    for (let i = 1; i < enhancedReports.length; i++) {
+    for (let i = 0; i < enhancedReports.length - 1; i++) {
         const current = enhancedReports[i];
-        const previous = enhancedReports[i - 1];
+        const previous = enhancedReports[i + 1];
 
         // חישוב צמיחה בהכנסות
         const currentRevenue = parseFloat(current.incomeStatement.totalRevenue);
@@ -359,36 +386,55 @@ function calculateGrowthMetrics(enhancedReports) {
  * יצירת מבנה הנתונים המלא לשמירה
  * @param {string} symbol - סימבול המניה
  * @param {Object} overviewData - מידע כללי על החברה
- * @param {Array} enhancedReports - דוחות משופרים
- * @param {Object} reportsData - נתונים גולמיים
+ * @param {Array} annualReports - דוחות שנתיים משופרים
+ * @param {Array} quarterlyReports - דוחות רבעוניים משופרים
+ * @param {Object} rawData - נתונים גולמיים
  * @returns {Object} - מבנה נתונים מלא
  */
-function createFullDataStructure(symbol, overviewData, enhancedReports, reportsData) {
+function createFullDataStructure(symbol, overviewData, annualReports, quarterlyReports, rawData) {
     return {
         symbol: symbol,
         fetchedAt: new Date().toISOString(),
         companyOverview: overviewData,
-        yearsAvailable: reportsData.years.length,
-        years: reportsData.years,
-        enhancedReports: enhancedReports,
+
+        // נתונים שנתיים
+        annual: {
+            periodsAvailable: annualReports.length,
+            periods: annualReports.map(r => r.period),
+            enhancedReports: annualReports
+        },
+
+        // נתונים רבעוניים
+        quarterly: {
+            periodsAvailable: quarterlyReports.length,
+            periods: quarterlyReports.map(r => r.period),
+            enhancedReports: quarterlyReports
+        },
+
+        // נתונים גולמיים (כולל גם annual וגם quarterly)
         rawData: {
             incomeStatement: {
-                years: reportsData.incomeYears,
-                reports: reportsData.incomeReports
+                annual: rawData.incomeData.annualReports || [],
+                quarterly: rawData.incomeData.quarterlyReports || []
             },
             balanceSheet: {
-                years: reportsData.balanceYears,
-                reports: reportsData.balanceReports
+                annual: rawData.balanceData.annualReports || [],
+                quarterly: rawData.balanceData.quarterlyReports || []
             },
             cashFlow: {
-                years: reportsData.cashFlowYears,
-                reports: reportsData.cashFlowReports
+                annual: rawData.cashFlowData.annualReports || [],
+                quarterly: rawData.cashFlowData.quarterlyReports || []
             },
             earnings: {
-                years: reportsData.earningsYears,
-                reports: reportsData.earningsReports
+                annual: rawData.earningsData.annualEarnings || [],
+                quarterly: rawData.earningsData.quarterlyEarnings || []
             }
-        }
+        },
+
+        // תאימות לאחור - ברירת מחדל שנתי
+        yearsAvailable: annualReports.length,
+        years: annualReports.map(r => r.period),
+        enhancedReports: annualReports
     };
 }
 
@@ -480,37 +526,42 @@ export async function getFinancials(symbol) {
             return null;
         }
 
-        // שלב 3: חילוץ דוחות ושנים
-        const reportsData = extractReportsAndYears(rawData);
-
         console.log('\n=== ENHANCED FINANCIAL STATEMENTS ===');
         console.log(`Symbol: ${symbol}`);
         console.log(`Currency: USD (in Billions)\n`);
 
-        // שלב 4: יצירת דוחות משופרים עם מדדים מחושבים
-        const enhancedReports = createEnhancedReports(reportsData);
+        // שלב 3: עיבוד דוחות שנתיים
+        console.log('\n📅 Processing ANNUAL reports...');
+        const annualReportsData = extractReportsAndYears(rawData, 'annual');
+        const annualEnhancedReports = createEnhancedReports(annualReportsData);
+        calculateGrowthMetrics(annualEnhancedReports);
 
-        // שלב 5: חישוב מדדי צמיחה
-        calculateGrowthMetrics(enhancedReports);
+        // שלב 4: עיבוד דוחות רבעוניים
+        console.log('\n📅 Processing QUARTERLY reports...');
+        const quarterlyReportsData = extractReportsAndYears(rawData, 'quarterly');
+        const quarterlyEnhancedReports = createEnhancedReports(quarterlyReportsData);
+        calculateGrowthMetrics(quarterlyEnhancedReports);
 
-        // שלב 6: יצירת מבנה נתונים מלא
+        // שלב 5: יצירת מבנה נתונים מלא
         const fullData = createFullDataStructure(
             symbol,
             rawData.overviewData,
-            enhancedReports,
-            reportsData
+            annualEnhancedReports,
+            quarterlyEnhancedReports,
+            rawData
         );
 
-        // שלב 7: הדפסת סיכום
+        // שלב 6: הדפסת סיכום
         console.log('\n✅ Data retrieved successfully!');
-        console.log(`📊 Total years available: ${reportsData.years.length}`);
-        console.log(`📈 Enhanced metrics calculated for each year`);
+        console.log(`📊 Annual periods available: ${annualEnhancedReports.length}`);
+        console.log(`📊 Quarterly periods available: ${quarterlyEnhancedReports.length}`);
+        console.log(`📈 Enhanced metrics calculated for both report types`);
 
-        // שלב 8: שמירה לקובץ
+        // שלב 7: שמירה לקובץ
         saveToFile(fullData, symbol);
 
-        // שלב 9: הדפסת סיכום מדדים
-        printMetricsSummary(enhancedReports);
+        // שלב 8: הדפסת סיכום מדדים (רק לשנתי)
+        printMetricsSummary(annualEnhancedReports);
 
         return fullData;
 

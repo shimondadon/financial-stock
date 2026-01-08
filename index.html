@@ -348,6 +348,42 @@
             font-size: 16px;
         }
 
+        .report-type-selector {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .report-type-btn {
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border: 2px solid #4a90e2;
+            background: white;
+            color: #4a90e2;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 180px;
+        }
+
+        .report-type-btn:hover {
+            background: #f0f8ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
+        }
+
+        .report-type-btn.active {
+            background: #4a90e2;
+            color: white;
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+        }
+
+        .report-type-btn.active:hover {
+            background: #3a7bc8;
+        }
+
         .data-table {
             width: 100%;
             border-collapse: collapse;
@@ -486,9 +522,22 @@
         <!-- Latest Metrics Summary -->
         <div id="metricsSummary" class="section"></div>
 
+        <!-- Report Type Selector (Annual vs Quarterly) -->
+        <div class="section">
+            <h3>📊 Report Type</h3>
+            <div class="report-type-selector">
+                <button id="annualBtn" class="report-type-btn active" onclick="switchReportType('annual')">
+                    📅 Annual Reports
+                </button>
+                <button id="quarterlyBtn" class="report-type-btn" onclick="switchReportType('quarterly')">
+                    📆 Quarterly Reports
+                </button>
+            </div>
+        </div>
+
         <!-- Year Selector -->
         <div class="section">
-            <h3>📅 Select Year</h3>
+            <h3 id="periodSelectorTitle">📅 Select Year</h3>
             <div class="year-selector-container">
                 <select id="yearSelector" class="year-selector" onchange="updateYearData()">
                     <option value="">Select a year...</option>
@@ -513,6 +562,7 @@
         const statusDiv = document.getElementById('status');
         const symbolInput = document.getElementById('symbol');
         let currentData = null;
+        let currentReportType = 'annual'; // 'annual' or 'quarterly'
 
         function setSymbol(symbol) {
             symbolInput.value = symbol;
@@ -551,6 +601,25 @@
             const formatted = formatNumber(value, 2) + '%';
             const className = value >= 0 ? 'positive' : 'negative';
             return `<span class="${className}">${formatted}</span>`;
+        }
+
+        function switchReportType(reportType) {
+            currentReportType = reportType;
+
+            // Update button states
+            document.getElementById('annualBtn').classList.toggle('active', reportType === 'annual');
+            document.getElementById('quarterlyBtn').classList.toggle('active', reportType === 'quarterly');
+
+            // Update section title
+            const title = document.getElementById('periodSelectorTitle');
+            if (title) {
+                title.textContent = reportType === 'annual' ? '📅 Select Year' : '📆 Select Quarter';
+            }
+
+            // Refresh the display with the new report type
+            if (currentData) {
+                displayYearlyTables(currentData);
+            }
         }
 
         function displayCompanyOverview(data) {
@@ -596,20 +665,20 @@
         }
 
         function displayMetricsSummary(data) {
-            if (!data.enhancedReports || data.enhancedReports.length === 0) {
+            // Use annual data for latest metrics
+            const annualData = data.annual || data;
+            if (!annualData.enhancedReports || annualData.enhancedReports.length === 0) {
                 document.getElementById('metricsSummary').innerHTML = '<p>No financial data available</p>';
                 return;
             }
 
-            // Find the latest year (newest/highest year number)
-            const latestReport = data.enhancedReports.reduce((latest, current) => {
-                return parseInt(current.year) > parseInt(latest.year) ? current : latest;
-            });
-
+            // Get the most recent annual report (first in the array since they're sorted descending)
+            const latestReport = annualData.enhancedReports[0];
             const metrics = latestReport.calculatedMetrics;
+            const latestYear = latestReport.period || latestReport.year;
 
             const html = `
-                <h3>📈 Latest Financial Metrics (${latestReport.year})</h3>
+                <h3>📈 Latest Financial Metrics (${latestYear})</h3>
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <label>Net Profit Margin</label>
@@ -641,55 +710,82 @@
         }
 
         function displayYearlyTables(data) {
-            if (!data.enhancedReports || data.enhancedReports.length === 0) {
-                document.getElementById('financialTables').innerHTML = '<p>No yearly data available</p>';
+            // Get the appropriate report type data
+            const reportTypeData = currentReportType === 'annual' ? (data.annual || data) : (data.quarterly || {});
+
+            if (!reportTypeData.enhancedReports || reportTypeData.enhancedReports.length === 0) {
+                document.getElementById('financialTables').innerHTML = `<p>No ${currentReportType} data available</p>`;
                 return;
             }
 
-            // Populate year selector (in descending order - newest to oldest)
-            const yearSelector = document.getElementById('yearSelector');
-            yearSelector.innerHTML = '<option value="">Select a year...</option>';
+            const reports = reportTypeData.enhancedReports;
 
-            // Sort reports by year in descending order
-            const sortedReports = [...data.enhancedReports].sort((a, b) => {
-                return parseInt(b.year) - parseInt(a.year);
+            // Populate period selector (in descending order - newest to oldest)
+            const yearSelector = document.getElementById('yearSelector');
+            const selectorLabel = currentReportType === 'annual' ? 'Select a year...' : 'Select a quarter...';
+            yearSelector.innerHTML = `<option value="">${selectorLabel}</option>`;
+
+            // Sort reports by period in descending order
+            const sortedReports = [...reports].sort((a, b) => {
+                const periodA = a.period || a.year;
+                const periodB = b.period || b.year;
+                return periodB.localeCompare(periodA);
             });
 
             sortedReports.forEach((report, sortedIndex) => {
-                // Find the original index in data.enhancedReports
-                const originalIndex = data.enhancedReports.findIndex(r => r.year === report.year);
+                // Find the original index in reports array
+                const originalIndex = reports.findIndex(r => (r.period || r.year) === (report.period || report.year));
 
                 const option = document.createElement('option');
                 option.value = originalIndex;
-                option.textContent = report.year;
+
+                // Display format: for annual show year, for quarterly show formatted date
+                if (currentReportType === 'annual') {
+                    option.textContent = report.period || report.year;
+                } else {
+                    // Format: "Q3 2024 (2024-09-30)"
+                    const period = report.period || report.fiscalDateEnding;
+                    const date = new Date(period);
+                    const quarter = Math.floor(date.getMonth() / 3) + 1;
+                    const year = date.getFullYear();
+                    option.textContent = `Q${quarter} ${year} (${period})`;
+                }
+
                 if (sortedIndex === 0) option.selected = true;
                 yearSelector.appendChild(option);
             });
 
-            // Display first year (newest) by default
+            // Display first period (newest) by default
             updateYearData();
         }
 
         function updateYearData() {
-            if (!currentData || !currentData.enhancedReports) return;
+            if (!currentData) return;
 
+            // Get the appropriate report type data
+            const reportTypeData = currentReportType === 'annual' ? (currentData.annual || currentData) : (currentData.quarterly || {});
+
+            if (!reportTypeData.enhancedReports) return;
+
+            const reports = reportTypeData.enhancedReports;
             const yearSelector = document.getElementById('yearSelector');
             const selectedIndex = yearSelector.value;
 
             if (selectedIndex === '') {
-                document.getElementById('financialTables').innerHTML = '<p style="text-align: center; color: #666; padding: 30px;">Please select a year to view financial data</p>';
+                const periodText = currentReportType === 'annual' ? 'year' : 'quarter';
+                document.getElementById('financialTables').innerHTML = `<p style="text-align: center; color: #666; padding: 30px;">Please select a ${periodText} to view financial data</p>`;
                 return;
             }
 
-            const report = currentData.enhancedReports[selectedIndex];
-            const year = report.year;
+            const report = reports[selectedIndex];
+            const period = report.period || report.year;
             const income = report.incomeStatement;
             const balance = report.balanceSheet;
             const cashFlow = report.cashFlow;
             const metrics = report.calculatedMetrics;
 
             const html = `
-                <h3>📊 Financial Data for Year ${year}</h3>
+                <h3>📊 Financial Data for ${currentReportType === 'annual' ? 'Year' : 'Quarter'} ${period}</h3>
 
                 <div style="margin-bottom: 30px;">
                     <h4 style="color: #667eea; margin-bottom: 15px; font-size: 18px; border-left: 4px solid #667eea; padding-left: 12px;">
