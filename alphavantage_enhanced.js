@@ -40,43 +40,112 @@ const parseValue = (val) => {
 };
 
 // ========================================
-// ניהול Cache
+// ניהול Cache - 5 קבצים נפרדים לכל מניה
 // ========================================
 
 /**
- * בדיקה אם קיים קובץ cache בתוקף למניה
+ * בדיקה אם כל קבצי ה-cache קיימים ותקפים למניה
  * @param {string} symbol - סימבול המניה
  * @returns {Object|null} - הנתונים מה-cache או null
  */
 function getCachedData(symbol) {
-    const filename = `financial_enhanced_${symbol}.json`;
-    const filepath = path.join(CACHE_DIR, filename);
+    const files = {
+        income: `income_${symbol}.json`,
+        balance: `balance_${symbol}.json`,
+        cashflow: `cashflow_${symbol}.json`,
+        earnings: `earnings_${symbol}.json`,
+        overview: `overview_${symbol}.json`
+    };
 
     try {
-        // בדיקה אם הקובץ קיים
-        if (fs.existsSync(filepath)) {
-            const stats = fs.statSync(filepath);
-            const fileAge = Date.now() - stats.mtimeMs;
-            const maxAge = 24 * 60 * 60 * 1000; // 24 שעות במילישניות
+        // בדיקה שכל הקבצים קיימים
+        const allFilesExist = Object.values(files).every(filename => {
+            return fs.existsSync(path.join(CACHE_DIR, filename));
+        });
 
-            // אם הקובץ עדיין בתוקף
-            if (fileAge < maxAge) {
-                console.log(`📂 Loading data from cache: ${filename}`);
-                console.log(`⏰ Cache age: ${(fileAge / (60 * 60 * 1000)).toFixed(2)} hours`);
-
-                const cachedData = JSON.parse(fs.readFileSync(filepath, 'utf8'));
-                return cachedData;
-            } else {
-                console.log(`⚠️ Cache expired (older than 24 hours), fetching fresh data...`);
-                // מחיקת הקובץ הישן
-                fs.unlinkSync(filepath);
-            }
+        if (!allFilesExist) {
+            console.log('⚠️ Some cache files missing, will fetch from API...');
+            return null;
         }
+
+        // בדיקת תוקף - נבדוק את הקובץ הראשון
+        const firstFilePath = path.join(CACHE_DIR, files.income);
+        const stats = fs.statSync(firstFilePath);
+        const fileAge = Date.now() - stats.mtimeMs;
+        const maxAge = 24 * 60 * 60 * 1000; // 24 שעות
+
+        if (fileAge >= maxAge) {
+            console.log(`⚠️ Cache expired (older than 24 hours), fetching fresh data...`);
+            // מחיקת כל הקבצים הישנים
+            Object.values(files).forEach(filename => {
+                const filepath = path.join(CACHE_DIR, filename);
+                if (fs.existsSync(filepath)) {
+                    fs.unlinkSync(filepath);
+                }
+            });
+            return null;
+        }
+
+        // טעינת כל הקבצים
+        console.log(`📂 Loading cached data for ${symbol}...`);
+        console.log(`⏰ Cache age: ${(fileAge / (60 * 60 * 1000)).toFixed(2)} hours`);
+
+        const cachedData = {
+            incomeData: JSON.parse(fs.readFileSync(path.join(CACHE_DIR, files.income), 'utf8')).data,
+            balanceData: JSON.parse(fs.readFileSync(path.join(CACHE_DIR, files.balance), 'utf8')).data,
+            cashFlowData: JSON.parse(fs.readFileSync(path.join(CACHE_DIR, files.cashflow), 'utf8')).data,
+            earningsData: JSON.parse(fs.readFileSync(path.join(CACHE_DIR, files.earnings), 'utf8')).data,
+            overviewData: JSON.parse(fs.readFileSync(path.join(CACHE_DIR, files.overview), 'utf8')).data
+        };
+
+        console.log('✅ All 5 cache files loaded successfully!');
+        return cachedData;
+
     } catch (err) {
         console.log(`⚠️ Error reading cache: ${err.message}`);
+        return null;
     }
+}
 
-    return null;
+/**
+ * שמירת נתונים ל-cache - 5 קבצים נפרדים
+ * @param {string} symbol - סימבול המניה
+ * @param {Object} rawData - הנתונים הגולמיים מ-API
+ */
+function saveDataToCache(symbol, rawData) {
+    console.log(`\n💾 Caching data for ${symbol} to 5 separate files...`);
+
+    try {
+        const files = [
+            { name: `income_${symbol}.json`, data: rawData.incomeData },
+            { name: `balance_${symbol}.json`, data: rawData.balanceData },
+            { name: `cashflow_${symbol}.json`, data: rawData.cashFlowData },
+            { name: `earnings_${symbol}.json`, data: rawData.earningsData },
+            { name: `overview_${symbol}.json`, data: rawData.overviewData }
+        ];
+
+        let totalSize = 0;
+
+        files.forEach(file => {
+            const filepath = path.join(CACHE_DIR, file.name);
+            const dataToSave = {
+                symbol: symbol,
+                fetchedAt: new Date().toISOString(),
+                data: file.data
+            };
+
+            fs.writeFileSync(filepath, JSON.stringify(dataToSave, null, 2), 'utf8');
+            const fileSize = fs.statSync(filepath).size;
+            totalSize += fileSize;
+            console.log(`  ✓ ${file.name} - ${(fileSize / 1024).toFixed(2)} KB`);
+        });
+
+        console.log(`📦 Total cache size: ${(totalSize / 1024).toFixed(2)} KB`);
+        console.log(`✅ All 5 files cached successfully!\n`);
+
+    } catch (err) {
+        console.error(`⚠️ Failed to cache data: ${err.message}`);
+    }
 }
 
 // ========================================
@@ -321,7 +390,7 @@ function createEnhancedReports(reportsData) {
         const matchPeriod = (report) => {
             if (!report.fiscalDateEnding) return false;
             return isAnnual ?
-                report.fiscalDateEnding.startsWith(period) :
+                report.fiscalDateEnding.startsWith((parseInt(period)-1).toString() ) :
                 report.fiscalDateEnding === period;
         };
 
@@ -508,36 +577,43 @@ function printMetricsSummary(enhancedReports) {
  */
 export async function getFinancials(symbol) {
     try {
-        // בדיקת cache תחילה
+        let rawData;
+
+        // בדיקת cache של 5 קבצים נפרדים
         const cachedData = getCachedData(symbol);
+
         if (cachedData) {
-            console.log('✅ Using cached data!');
-            return cachedData;
-        }
+            console.log('✅ Found cached files! Using cached data and recalculating...');
+            rawData = cachedData;
+        } else {
+            console.log('🔄 No cache found, fetching fresh data from API...');
 
-        console.log('🔄 Fetching fresh data from API...');
+            // שלב 1: משיכת כל הנתונים מ-API
+            rawData = await fetchAllFinancialData(symbol);
 
-        // שלב 1: משיכת כל הנתונים מ-API
-        const rawData = await fetchAllFinancialData(symbol);
+            // שלב 2: בדיקת שגיאות
+            const hasErrors = checkForErrors(rawData);
+            if (hasErrors) {
+                return null;
+            }
 
-        // שלב 2: בדיקת שגיאות
-        const hasErrors = checkForErrors(rawData);
-        if (hasErrors) {
-            return null;
+            // שמירת 5 קבצים נפרדים ל-cache
+            saveDataToCache(symbol, rawData);
         }
 
         console.log('\n=== ENHANCED FINANCIAL STATEMENTS ===');
         console.log(`Symbol: ${symbol}`);
-        console.log(`Currency: USD (in Billions)\n`);
+        console.log(`Currency: USD (in Billions)`);
+        console.log(`🔄 Processing data (calculations are always fresh!)\n`);
 
-        // שלב 3: עיבוד דוחות שנתיים
-        console.log('\n📅 Processing ANNUAL reports...');
+        // שלב 3: עיבוד דוחות שנתיים (תמיד מחדש!)
+        console.log('📅 Processing ANNUAL reports...');
         const annualReportsData = extractReportsAndYears(rawData, 'annual');
         const annualEnhancedReports = createEnhancedReports(annualReportsData);
         calculateGrowthMetrics(annualEnhancedReports);
 
-        // שלב 4: עיבוד דוחות רבעוניים
-        console.log('\n📅 Processing QUARTERLY reports...');
+        // שלב 4: עיבוד דוחות רבעוניים (תמיד מחדש!)
+        console.log('📅 Processing QUARTERLY reports...');
         const quarterlyReportsData = extractReportsAndYears(rawData, 'quarterly');
         const quarterlyEnhancedReports = createEnhancedReports(quarterlyReportsData);
         calculateGrowthMetrics(quarterlyEnhancedReports);
@@ -552,15 +628,12 @@ export async function getFinancials(symbol) {
         );
 
         // שלב 6: הדפסת סיכום
-        console.log('\n✅ Data retrieved successfully!');
+        console.log('\n✅ Data processed successfully!');
         console.log(`📊 Annual periods available: ${annualEnhancedReports.length}`);
         console.log(`📊 Quarterly periods available: ${quarterlyEnhancedReports.length}`);
         console.log(`📈 Enhanced metrics calculated for both report types`);
 
-        // שלב 7: שמירה לקובץ
-        saveToFile(fullData, symbol);
-
-        // שלב 8: הדפסת סיכום מדדים (רק לשנתי)
+        // שלב 7: הדפסת סיכום מדדים (רק לשנתי)
         printMetricsSummary(annualEnhancedReports);
 
         return fullData;
@@ -580,6 +653,6 @@ export async function getFinancials(symbol) {
 // console.log('==============================================\n');
 // console.log('Note: Free API key allows 5 requests per minute and 500 per day');
 // console.log('Get your free API key at: https://www.alphavantage.co/support/#api-key\n');
-// getFinancials('CRM');
+// getFinancials('F');
 
 // Or run the web server with: node server.js
