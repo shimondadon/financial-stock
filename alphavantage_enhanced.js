@@ -1,11 +1,23 @@
 import fetch from 'node-fetch';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ========================================
 // הגדרות גלובליות
 // ========================================
 const API_KEY = 'TT0O07L0Y7DO2PHV'; // ה-API key שלך
 const BASE_URL = 'https://www.alphavantage.co/query';
+const CACHE_DIR = path.join(__dirname, 'cache');
+
+// Create cache directory if it doesn't exist
+if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    console.log('📁 Created cache directory');
+}
 
 // ========================================
 // פונקציות עזר (Utility Functions)
@@ -28,6 +40,46 @@ const parseValue = (val) => {
 };
 
 // ========================================
+// ניהול Cache
+// ========================================
+
+/**
+ * בדיקה אם קיים קובץ cache בתוקף למניה
+ * @param {string} symbol - סימבול המניה
+ * @returns {Object|null} - הנתונים מה-cache או null
+ */
+function getCachedData(symbol) {
+    const filename = `financial_enhanced_${symbol}.json`;
+    const filepath = path.join(CACHE_DIR, filename);
+
+    try {
+        // בדיקה אם הקובץ קיים
+        if (fs.existsSync(filepath)) {
+            const stats = fs.statSync(filepath);
+            const fileAge = Date.now() - stats.mtimeMs;
+            const maxAge = 24 * 60 * 60 * 1000; // 24 שעות במילישניות
+
+            // אם הקובץ עדיין בתוקף
+            if (fileAge < maxAge) {
+                console.log(`📂 Loading data from cache: ${filename}`);
+                console.log(`⏰ Cache age: ${(fileAge / (60 * 60 * 1000)).toFixed(2)} hours`);
+
+                const cachedData = JSON.parse(fs.readFileSync(filepath, 'utf8'));
+                return cachedData;
+            } else {
+                console.log(`⚠️ Cache expired (older than 24 hours), fetching fresh data...`);
+                // מחיקת הקובץ הישן
+                fs.unlinkSync(filepath);
+            }
+        }
+    } catch (err) {
+        console.log(`⚠️ Error reading cache: ${err.message}`);
+    }
+
+    return null;
+}
+
+// ========================================
 // משיכת נתונים מ-API
 // ========================================
 
@@ -40,7 +92,7 @@ async function fetchAllFinancialData(symbol) {
     console.log(`Fetching financial data for ${symbol}...`);
 
     // קבלת Income Statement
-    console.log('Fetching Income Statement...');
+    console.log('Fetching Income Statement...', `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY}`);
     const incomeResponse = await fetch(
         `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY}`
     );
@@ -272,9 +324,9 @@ function createEnhancedReports(reportsData) {
  * @param {Array} enhancedReports - מערך הדוחות המשופרים
  */
 function calculateGrowthMetrics(enhancedReports) {
-    for (let i = 0; i < enhancedReports.length - 1; i++) {
+    for (let i = 1; i < enhancedReports.length; i++) {
         const current = enhancedReports[i];
-        const previous = enhancedReports[i + 1];
+        const previous = enhancedReports[i - 1];
 
         // חישוב צמיחה בהכנסות
         const currentRevenue = parseFloat(current.incomeStatement.totalRevenue);
@@ -341,18 +393,19 @@ function createFullDataStructure(symbol, overviewData, enhancedReports, reportsD
 }
 
 /**
- * שמירת הנתונים לקובץ JSON
+ * שמירת הנתונים לקובץ JSON (ללא timestamp בשם)
  * @param {Object} fullData - הנתונים המלאים
  * @param {string} symbol - סימבול המניה
  */
 function saveToFile(fullData, symbol) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `financial_enhanced_${symbol}_${timestamp}.json`;
+    const filename = `financial_enhanced_${symbol}.json`;
+    const filepath = path.join(CACHE_DIR, filename);
 
     try {
-        fs.writeFileSync(filename, JSON.stringify(fullData, null, 2), 'utf8');
+        fs.writeFileSync(filepath, JSON.stringify(fullData, null, 2), 'utf8');
         console.log(`\n💾 Enhanced JSON saved to file: ${filename}`);
-        console.log(`📁 File size: ${(fs.statSync(filename).size / 1024).toFixed(2)} KB`);
+        console.log(`📁 File location: ${filepath}`);
+        console.log(`📦 File size: ${(fs.statSync(filepath).size / 1024).toFixed(2)} KB`);
         return filename;
     } catch (writeErr) {
         console.error(`\n⚠️ Failed to save JSON to file: ${writeErr.message}`);
@@ -409,6 +462,15 @@ function printMetricsSummary(enhancedReports) {
  */
 export async function getFinancials(symbol) {
     try {
+        // בדיקת cache תחילה
+        const cachedData = getCachedData(symbol);
+        if (cachedData) {
+            console.log('✅ Using cached data!');
+            return cachedData;
+        }
+
+        console.log('🔄 Fetching fresh data from API...');
+
         // שלב 1: משיכת כל הנתונים מ-API
         const rawData = await fetchAllFinancialData(symbol);
 

@@ -17,45 +17,6 @@ if (!fs.existsSync(CACHE_DIR)) {
     console.log('📁 Created cache directory');
 }
 
-/**
- * Get today's date in YYYY-MM-DD format
- */
-function getTodayDate() {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-}
-
-/**
- * Check if cached file exists for symbol from today
- */
-function getCachedFileForToday(symbol) {
-    const todayDate = getTodayDate();
-    const files = fs.readdirSync(CACHE_DIR);
-
-    // Look for files matching pattern: financial_enhanced_SYMBOL_YYYY-MM-DD*.json
-    const pattern = `financial_enhanced_${symbol}_${todayDate}`;
-    const matchingFile = files.find(file => file.startsWith(pattern) && file.endsWith('.json'));
-
-    if (matchingFile) {
-        return path.join(CACHE_DIR, matchingFile);
-    }
-
-    return null;
-}
-
-/**
- * Save data to cache
- */
-function saveToCache(symbol, data) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `financial_enhanced_${symbol}_${timestamp}.json`;
-    const filepath = path.join(CACHE_DIR, filename);
-
-    fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
-    console.log(`💾 Cached data to: ${filename}`);
-
-    return { filename, filepath };
-}
 
 // Middleware
 app.use(express.json());
@@ -83,25 +44,7 @@ app.post('/api/financials', async (req, res) => {
         const upperSymbol = symbol.toUpperCase();
         console.log(`\n📊 Processing request for symbol: ${upperSymbol}`);
 
-        // Check if cached file exists from today
-        const cachedFilePath = getCachedFileForToday(upperSymbol);
-
-        if (cachedFilePath) {
-            console.log(`✨ Found cached data from today, serving cached file`);
-
-            const cachedData = JSON.parse(fs.readFileSync(cachedFilePath, 'utf8'));
-            const filename = path.basename(cachedFilePath);
-
-            // Send cached data as JSON (not as download)
-            res.setHeader('Content-Type', 'application/json');
-            res.json(cachedData);
-
-            console.log(`✅ Successfully sent cached data: ${filename}\n`);
-            return;
-        }
-
-        // No cache found, fetch fresh data from API
-        console.log(`🔄 No cached data found, fetching from API...`);
+        // getFinancials handles cache checking automatically
         const data = await getFinancials(upperSymbol);
 
         if (!data) {
@@ -110,14 +53,11 @@ app.post('/api/financials', async (req, res) => {
             });
         }
 
-        // Save to cache
-        const { filename } = saveToCache(upperSymbol, data);
-
-        // Send data as JSON (not as download)
+        // Send data as JSON
         res.setHeader('Content-Type', 'application/json');
         res.json(data);
 
-        console.log(`✅ Successfully sent fresh data: ${filename}\n`);
+        console.log(`✅ Successfully sent data for ${upperSymbol}\n`);
 
     } catch (error) {
         console.error('Server error:', error);
@@ -136,6 +76,6 @@ app.listen(PORT, () => {
     console.log(`💾 Cache directory: ${CACHE_DIR}`);
     console.log(`\n⚠️  Note: Free API key allows 5 requests per minute`);
     console.log(`    Each request takes ~60-90 seconds due to API rate limits`);
-    console.log(`✨  Cached data from today will be served instantly\n`);
+    console.log(`✨  Cached data (less than 24 hours old) will be served instantly\n`);
 });
 
