@@ -279,10 +279,11 @@ function extractReportsAndYears(data, reportType = 'annual') {
 
     // הדפסת סיכום
     console.log(`\n=== Available ${isAnnual ? 'Years' : 'Quarters'} (${reportType.toUpperCase()}) ===`);
-    console.log(`Income Statement: ${incomeReports.length} ${isAnnual ? 'years' : 'quarters'}`);
-    console.log(`Balance Sheet: ${balanceReports.length} ${isAnnual ? 'years' : 'quarters'}`);
-    console.log(`Cash Flow: ${cashFlowReports.length} ${isAnnual ? 'years' : 'quarters'}`);
-    console.log(`Earnings: ${earningsReports.length} ${isAnnual ? 'years' : 'quarters'}`);
+    console.log(`Income Statement: ${incomeReports.length} ${isAnnual ? 'years' : 'quarters'} (${incomePeriods.length > 0 ? incomePeriods[0] + ' to ' + incomePeriods[incomePeriods.length - 1] : 'none'})`);
+    console.log(`Balance Sheet: ${balanceReports.length} ${isAnnual ? 'years' : 'quarters'} (${balancePeriods.length > 0 ? balancePeriods[0] + ' to ' + balancePeriods[balancePeriods.length - 1] : 'none'})`);
+    console.log(`Cash Flow: ${cashFlowReports.length} ${isAnnual ? 'years' : 'quarters'} (${cashFlowPeriods.length > 0 ? cashFlowPeriods[0] + ' to ' + cashFlowPeriods[cashFlowPeriods.length - 1] : 'none'})`);
+    console.log(`Earnings: ${earningsReports.length} ${isAnnual ? 'years' : 'quarters'} (${earningsPeriods.length > 0 ? earningsPeriods[0] + ' to ' + earningsPeriods[earningsPeriods.length - 1] : 'none'})`);
+    console.log(`📊 Total unique periods (union): ${periods.length}`);
 
     return {
         reportType,
@@ -317,47 +318,53 @@ function extractReportsAndYears(data, reportType = 'annual') {
  * @returns {Object} - מדדים מחושבים
  */
 function calculateFinancialMetrics(income, balance, cashFlow, earnings) {
-    const revenue = parseValue(income.totalRevenue);
-    const netIncome = parseValue(income.netIncome);
-    const totalAssets = parseValue(balance.totalAssets);
-    const equity = parseValue(balance.totalShareholderEquity);
-    const currentAssets = parseValue(balance.totalCurrentAssets);
-    const currentLiabilities = parseValue(balance.totalCurrentLiabilities);
-    const longTermDebt = parseValue(balance.longTermDebt);
-    const operatingCashFlow = parseValue(cashFlow.operatingCashflow);
-    const capex = parseValue(cashFlow.capitalExpenditures);
+    // בדיקה אם הדוחות קיימים (לא אובייקט ריק)
+    const hasIncome = income && Object.keys(income).length > 0;
+    const hasBalance = balance && Object.keys(balance).length > 0;
+    const hasCashFlow = cashFlow && Object.keys(cashFlow).length > 0;
+    const hasEarnings = earnings && Object.keys(earnings).length > 0;
+
+    const revenue = hasIncome ? parseValue(income.totalRevenue) : null;
+    const netIncome = hasIncome ? parseValue(income.netIncome) : null;
+    const totalAssets = hasBalance ? parseValue(balance.totalAssets) : null;
+    const equity = hasBalance ? parseValue(balance.totalShareholderEquity) : null;
+    const currentAssets = hasBalance ? parseValue(balance.totalCurrentAssets) : null;
+    const currentLiabilities = hasBalance ? parseValue(balance.totalCurrentLiabilities) : null;
+    const longTermDebt = hasBalance ? parseValue(balance.longTermDebt) : null;
+    const operatingCashFlow = hasCashFlow ? parseValue(cashFlow.operatingCashflow) : null;
+    const capex = hasCashFlow ? parseValue(cashFlow.capitalExpenditures) : null;
     const freeCashFlow = operatingCashFlow && capex ? operatingCashFlow + capex : null;
-    const shares = parseValue(balance.commonStockSharesOutstanding);
-    const eps = parseValue(earnings.reportedEPS);
+    const shares = hasBalance ? parseValue(balance.commonStockSharesOutstanding) : null;
+    const eps = hasEarnings ? parseValue(earnings.reportedEPS) : null;
 
     return {
         // Profitability Ratios
-        grossProfitMargin: revenue ? (parseValue(income.grossProfit) / revenue) * 100 : null,
-        operatingMargin: revenue ? (parseValue(income.operatingIncome) / revenue) * 100 : null,
+        grossProfitMargin: (hasIncome && revenue) ? (parseValue(income.grossProfit) / revenue) * 100 : null,
+        operatingMargin: (hasIncome && revenue) ? (parseValue(income.operatingIncome) / revenue) * 100 : null,
         netProfitMargin: revenue && netIncome ? (netIncome / revenue) * 100 : null,
         returnOnAssets: totalAssets && netIncome ? (netIncome / totalAssets) * 100 : null,
         returnOnEquity: equity && netIncome ? (netIncome / equity) * 100 : null,
 
         // Liquidity Ratios
-        currentRatio: currentLiabilities ? currentAssets / currentLiabilities : null,
-        quickRatio: currentLiabilities && currentAssets ?
+        currentRatio: (currentLiabilities && currentAssets) ? currentAssets / currentLiabilities : null,
+        quickRatio: (currentLiabilities && currentAssets && hasBalance) ?
             (currentAssets - parseValue(balance.inventory)) / currentLiabilities : null,
-        workingCapital: currentAssets && currentLiabilities ? currentAssets - currentLiabilities : null,
+        workingCapital: (currentAssets && currentLiabilities) ? currentAssets - currentLiabilities : null,
 
         // Leverage Ratios
-        debtToEquity: equity && longTermDebt ? longTermDebt / equity : null,
-        debtToAssets: totalAssets && longTermDebt ? longTermDebt / totalAssets : null,
-        equityRatio: totalAssets && equity ? equity / totalAssets : null,
+        debtToEquity: (equity && longTermDebt) ? longTermDebt / equity : null,
+        debtToAssets: (totalAssets && longTermDebt) ? longTermDebt / totalAssets : null,
+        equityRatio: (totalAssets && equity) ? equity / totalAssets : null,
 
         // Cash Flow Ratios
         freeCashFlow: freeCashFlow,
-        freeCashFlowToRevenue: revenue && freeCashFlow ? (freeCashFlow / revenue) * 100 : null,
-        cashFlowToDebt: longTermDebt && operatingCashFlow ? operatingCashFlow / longTermDebt : null,
+        freeCashFlowToRevenue: (revenue && freeCashFlow) ? (freeCashFlow / revenue) * 100 : null,
+        cashFlowToDebt: (longTermDebt && operatingCashFlow) ? operatingCashFlow / longTermDebt : null,
 
         // Per Share Metrics
         earningsPerShare: eps,
-        bookValuePerShare: shares && equity ? equity / shares : null,
-        cashPerShare: shares ? parseValue(balance.cashAndCashEquivalentsAtCarryingValue) / shares : null,
+        bookValuePerShare: (shares && equity) ? equity / shares : null,
+        cashPerShare: (shares && hasBalance) ? parseValue(balance.cashAndCashEquivalentsAtCarryingValue) / shares : null,
 
         // Growth Metrics (will be calculated later)
         revenueGrowth: null,
@@ -365,13 +372,13 @@ function calculateFinancialMetrics(income, balance, cashFlow, earnings) {
         epsGrowth: null,
 
         // Asset Efficiency
-        assetTurnover: totalAssets && revenue ? revenue / totalAssets : null,
-        inventoryTurnover: parseValue(balance.inventory) && parseValue(income.costOfRevenue) ?
+        assetTurnover: (totalAssets && revenue) ? revenue / totalAssets : null,
+        inventoryTurnover: (hasBalance && hasIncome && parseValue(balance.inventory) && parseValue(income.costOfRevenue)) ?
             parseValue(income.costOfRevenue) / parseValue(balance.inventory) : null,
 
         // Other Important Metrics
-        ebitdaMargin: revenue && parseValue(income.ebitda) ? (parseValue(income.ebitda) / revenue) * 100 : null,
-        interestCoverage: parseValue(income.interestExpense) && parseValue(income.operatingIncome) ?
+        ebitdaMargin: (hasIncome && revenue && parseValue(income.ebitda)) ? (parseValue(income.ebitda) / revenue) * 100 : null,
+        interestCoverage: (hasIncome && parseValue(income.interestExpense) && parseValue(income.operatingIncome)) ?
             parseValue(income.operatingIncome) / Math.abs(parseValue(income.interestExpense)) : null,
     };
 }
@@ -390,7 +397,7 @@ function createEnhancedReports(reportsData) {
         const matchPeriod = (report) => {
             if (!report.fiscalDateEnding) return false;
             return isAnnual ?
-                report.fiscalDateEnding.startsWith((parseInt(period)-1).toString() ) :
+                report.fiscalDateEnding.startsWith((parseInt(period)).toString() ) :
                 report.fiscalDateEnding === period;
         };
 
@@ -399,11 +406,27 @@ function createEnhancedReports(reportsData) {
         const cashFlow = cashFlowReports.find(matchPeriod) || {};
         const earnings = earningsReports.find(matchPeriod) || {};
 
+        // בדיקה איזה דוחות זמינים
+        const hasIncome = income && Object.keys(income).length > 0;
+        const hasBalance = balance && Object.keys(balance).length > 0;
+        const hasCashFlow = cashFlow && Object.keys(cashFlow).length > 0;
+        const hasEarnings = earnings && Object.keys(earnings).length > 0;
+
         return {
             period,  // יכול להיות שנה (2024) או תאריך מלא (2024-12-31)
             year: isAnnual ? period : period.substring(0, 4),  // תמיד שנה
-            fiscalDateEnding: income.fiscalDateEnding || balance.fiscalDateEnding || cashFlow.fiscalDateEnding,
+            fiscalDateEnding: income.fiscalDateEnding || balance.fiscalDateEnding || cashFlow.fiscalDateEnding || earnings.fiscalDateEnding,
             reportType,
+
+            // אינדיקטור זמינות דוחות
+            availableReports: {
+                incomeStatement: hasIncome,
+                balanceSheet: hasBalance,
+                cashFlow: hasCashFlow,
+                earnings: hasEarnings,
+                completeness: (hasIncome && hasBalance && hasCashFlow && hasEarnings) ? 'complete' : 'partial'
+            },
+
             incomeStatement: income,
             balanceSheet: balance,
             cashFlow: cashFlow,
@@ -424,25 +447,31 @@ function calculateGrowthMetrics(enhancedReports) {
         const current = enhancedReports[i];
         const previous = enhancedReports[i + 1];
 
-        // חישוב צמיחה בהכנסות
-        const currentRevenue = parseFloat(current.incomeStatement.totalRevenue);
-        const previousRevenue = parseFloat(previous.incomeStatement.totalRevenue);
-        if (currentRevenue && previousRevenue) {
-            current.calculatedMetrics.revenueGrowth = ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+        // חישוב צמיחה בהכנסות - רק אם יש income statement לשתי התקופות
+        if (current.availableReports.incomeStatement && previous.availableReports.incomeStatement) {
+            const currentRevenue = parseFloat(current.incomeStatement.totalRevenue);
+            const previousRevenue = parseFloat(previous.incomeStatement.totalRevenue);
+            if (currentRevenue && previousRevenue && previousRevenue !== 0) {
+                current.calculatedMetrics.revenueGrowth = ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+            }
         }
 
-        // חישוב צמיחה ברווח נקי
-        const currentNetIncome = parseFloat(current.incomeStatement.netIncome);
-        const previousNetIncome = parseFloat(previous.incomeStatement.netIncome);
-        if (currentNetIncome && previousNetIncome && previousNetIncome !== 0) {
-            current.calculatedMetrics.netIncomeGrowth = ((currentNetIncome - previousNetIncome) / previousNetIncome) * 100;
+        // חישוב צמיחה ברווח נקי - רק אם יש income statement לשתי התקופות
+        if (current.availableReports.incomeStatement && previous.availableReports.incomeStatement) {
+            const currentNetIncome = parseFloat(current.incomeStatement.netIncome);
+            const previousNetIncome = parseFloat(previous.incomeStatement.netIncome);
+            if (currentNetIncome && previousNetIncome && previousNetIncome !== 0) {
+                current.calculatedMetrics.netIncomeGrowth = ((currentNetIncome - previousNetIncome) / previousNetIncome) * 100;
+            }
         }
 
-        // חישוב צמיחה ב-EPS
-        const currentEPS = parseFloat(current.earnings.reportedEPS);
-        const previousEPS = parseFloat(previous.earnings.reportedEPS);
-        if (currentEPS && previousEPS && previousEPS !== 0) {
-            current.calculatedMetrics.epsGrowth = ((currentEPS - previousEPS) / previousEPS) * 100;
+        // חישוב צמיחה ב-EPS - רק אם יש earnings לשתי התקופות
+        if (current.availableReports.earnings && previous.availableReports.earnings) {
+            const currentEPS = parseFloat(current.earnings.reportedEPS);
+            const previousEPS = parseFloat(previous.earnings.reportedEPS);
+            if (currentEPS && previousEPS && previousEPS !== 0) {
+                current.calculatedMetrics.epsGrowth = ((currentEPS - previousEPS) / previousEPS) * 100;
+            }
         }
     }
 }
@@ -540,30 +569,45 @@ function printMetricsSummary(enhancedReports) {
         return;
     }
 
-    const latest = enhancedReports[0].calculatedMetrics;
-    console.log(`Year: ${enhancedReports[0].year}`);
+    const latest = enhancedReports[0];
+    const metrics = latest.calculatedMetrics;
+    const available = latest.availableReports;
+
+    console.log(`Year: ${latest.year}`);
+    console.log(`\n📋 Available Reports:`);
+    console.log(`  Income Statement: ${available.incomeStatement ? '✅' : '❌'}`);
+    console.log(`  Balance Sheet: ${available.balanceSheet ? '✅' : '❌'}`);
+    console.log(`  Cash Flow: ${available.cashFlow ? '✅' : '❌'}`);
+    console.log(`  Earnings: ${available.earnings ? '✅' : '❌'}`);
+    console.log(`  Completeness: ${available.completeness === 'complete' ? '✅ Complete' : '⚠️ Partial'}`);
+
+    // פונקציית עזר להצגת ערך או N/A
+    const formatValue = (value, suffix = '', decimals = 2) => {
+        if (value === null || value === undefined) return 'N/A';
+        return `${value.toFixed(decimals)}${suffix}`;
+    };
 
     console.log('\nProfitability:');
-    console.log(`  Gross Profit Margin: ${latest.grossProfitMargin?.toFixed(2)}%`);
-    console.log(`  Operating Margin: ${latest.operatingMargin?.toFixed(2)}%`);
-    console.log(`  Net Profit Margin: ${latest.netProfitMargin?.toFixed(2)}%`);
-    console.log(`  ROA: ${latest.returnOnAssets?.toFixed(2)}%`);
-    console.log(`  ROE: ${latest.returnOnEquity?.toFixed(2)}%`);
+    console.log(`  Gross Profit Margin: ${formatValue(metrics.grossProfitMargin, '%')}`);
+    console.log(`  Operating Margin: ${formatValue(metrics.operatingMargin, '%')}`);
+    console.log(`  Net Profit Margin: ${formatValue(metrics.netProfitMargin, '%')}`);
+    console.log(`  ROA: ${formatValue(metrics.returnOnAssets, '%')}`);
+    console.log(`  ROE: ${formatValue(metrics.returnOnEquity, '%')}`);
 
     console.log('\nLiquidity:');
-    console.log(`  Current Ratio: ${latest.currentRatio?.toFixed(2)}`);
-    console.log(`  Quick Ratio: ${latest.quickRatio?.toFixed(2)}`);
-    console.log(`  Working Capital: $${(latest.workingCapital / 1e9)?.toFixed(2)}B`);
+    console.log(`  Current Ratio: ${formatValue(metrics.currentRatio, '')}`);
+    console.log(`  Quick Ratio: ${formatValue(metrics.quickRatio, '')}`);
+    console.log(`  Working Capital: ${metrics.workingCapital !== null ? `$${(metrics.workingCapital / 1e9).toFixed(2)}B` : 'N/A'}`);
 
     console.log('\nLeverage:');
-    console.log(`  Debt-to-Equity: ${latest.debtToEquity?.toFixed(2)}`);
-    console.log(`  Debt-to-Assets: ${latest.debtToAssets?.toFixed(2)}`);
-    console.log(`  Equity Ratio: ${latest.equityRatio?.toFixed(2)}`);
+    console.log(`  Debt-to-Equity: ${formatValue(metrics.debtToEquity, '')}`);
+    console.log(`  Debt-to-Assets: ${formatValue(metrics.debtToAssets, '')}`);
+    console.log(`  Equity Ratio: ${formatValue(metrics.equityRatio, '')}`);
 
     console.log('\nGrowth:');
-    console.log(`  Revenue Growth: ${latest.revenueGrowth?.toFixed(2)}%`);
-    console.log(`  Net Income Growth: ${latest.netIncomeGrowth?.toFixed(2)}%`);
-    console.log(`  EPS Growth: ${latest.epsGrowth?.toFixed(2)}%`);
+    console.log(`  Revenue Growth: ${formatValue(metrics.revenueGrowth, '%')}`);
+    console.log(`  Net Income Growth: ${formatValue(metrics.netIncomeGrowth, '%')}`);
+    console.log(`  EPS Growth: ${formatValue(metrics.epsGrowth, '%')}`);
 }
 
 // ========================================
@@ -629,8 +673,17 @@ export async function getFinancials(symbol) {
 
         // שלב 6: הדפסת סיכום
         console.log('\n✅ Data processed successfully!');
-        console.log(`📊 Annual periods available: ${annualEnhancedReports.length}`);
-        console.log(`📊 Quarterly periods available: ${quarterlyEnhancedReports.length}`);
+
+        // סיכום שנתי
+        const annualComplete = annualEnhancedReports.filter(r => r.availableReports.completeness === 'complete').length;
+        const annualPartial = annualEnhancedReports.length - annualComplete;
+        console.log(`📊 Annual periods: ${annualEnhancedReports.length} total (${annualComplete} complete, ${annualPartial} partial)`);
+
+        // סיכום רבעוני
+        const quarterlyComplete = quarterlyEnhancedReports.filter(r => r.availableReports.completeness === 'complete').length;
+        const quarterlyPartial = quarterlyEnhancedReports.length - quarterlyComplete;
+        console.log(`📊 Quarterly periods: ${quarterlyEnhancedReports.length} total (${quarterlyComplete} complete, ${quarterlyPartial} partial)`);
+
         console.log(`📈 Enhanced metrics calculated for both report types`);
 
         // שלב 7: הדפסת סיכום מדדים (רק לשנתי)

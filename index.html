@@ -622,6 +622,14 @@
             }
         }
 
+        function updateMetricsYear(selectedIndex) {
+            if (!currentData || selectedIndex === '') {
+                return;
+            }
+            // Update the metrics display with the selected year
+            displayMetricsSummary(currentData, parseInt(selectedIndex));
+        }
+
         function displayCompanyOverview(data) {
             const overview = data.companyOverview;
             const html = `
@@ -664,7 +672,7 @@
             document.getElementById('companyOverview').innerHTML = html;
         }
 
-        function displayMetricsSummary(data) {
+        function displayMetricsSummary(data, selectedIndex = null) {
             // Use annual data for latest metrics
             const annualData = data.annual || data;
             if (!annualData.enhancedReports || annualData.enhancedReports.length === 0) {
@@ -672,13 +680,56 @@
                 return;
             }
 
-            // Get the most recent annual report (first in the array since they're sorted descending)
-            const latestReport = annualData.enhancedReports[0];
-            const metrics = latestReport.calculatedMetrics;
-            const latestYear = latestReport.period || latestReport.year;
+            // Find the most recent COMPLETE annual report (with all 4 reports available)
+            let reportToDisplay;
+            let displayIndex;
+
+            if (selectedIndex !== null && selectedIndex >= 0 && selectedIndex < annualData.enhancedReports.length) {
+                // User selected a specific year
+                reportToDisplay = annualData.enhancedReports[selectedIndex];
+                displayIndex = selectedIndex;
+                console.log('📊 Metrics: User selected year index', selectedIndex);
+            } else {
+                // Find the first complete report
+                const completeReportIndex = annualData.enhancedReports.findIndex(report =>
+                    report.availableReports && report.availableReports.completeness === 'complete'
+                );
+
+                if (completeReportIndex !== -1) {
+                    reportToDisplay = annualData.enhancedReports[completeReportIndex];
+                    displayIndex = completeReportIndex;
+                    console.log('📊 Metrics: Found first complete report at index', completeReportIndex, '- Year:', reportToDisplay.period || reportToDisplay.year);
+                } else {
+                    // If no complete report, use the first one (most recent)
+                    reportToDisplay = annualData.enhancedReports[0];
+                    displayIndex = 0;
+                    console.log('⚠️ Metrics: No complete report found, using first report - Year:', reportToDisplay.period || reportToDisplay.year);
+                }
+            }
+
+            const metrics = reportToDisplay.calculatedMetrics;
+            const displayYear = reportToDisplay.period || reportToDisplay.year;
+            const isComplete = reportToDisplay.availableReports && reportToDisplay.availableReports.completeness === 'complete';
+            const completenessIcon = isComplete ? '✅' : '⚠️';
+            const completenessText = isComplete ? 'Complete' : 'Partial';
+
+            // Build year selector options
+            let selectorOptions = '<option value="">Select a year...</option>';
+            annualData.enhancedReports.forEach((report, index) => {
+                const year = report.period || report.year;
+                const complete = report.availableReports && report.availableReports.completeness === 'complete';
+                const icon = complete ? '✅' : '⚠️';
+                const selected = index === displayIndex ? 'selected' : '';
+                selectorOptions += `<option value="${index}" ${selected}>${year} ${icon}</option>`;
+            });
 
             const html = `
-                <h3>📈 Latest Financial Metrics (${latestYear})</h3>
+                <h3>📈 Financial Metrics for Year ${displayYear} ${completenessIcon} (${completenessText})</h3>
+                <div class="year-selector-container">
+                    <select id="metricsYearSelector" class="year-selector" onchange="updateMetricsYear(this.value)">
+                        ${selectorOptions}
+                    </select>
+                </div>
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <label>Net Profit Margin</label>
