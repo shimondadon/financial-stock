@@ -12,21 +12,35 @@ export async function connectDB() {
         return;
     }
 
+    console.log('🔌 Attempting to connect to MongoDB...');
+
     try {
         const mongoUri = process.env.MONGODB_URI;
 
-        if (!mongoUri || mongoUri.includes('<username>') || mongoUri.includes('<password>')) {
+        console.log(`📋 MongoDB URI exists: ${!!mongoUri}`);
+        console.log(`📋 MongoDB URI length: ${mongoUri ? mongoUri.length : 0} characters`);
+
+        if (!mongoUri || mongoUri.includes('<username>') || mongoUri.includes('<password>') || mongoUri.includes('<cluster-url>')) {
             console.error('❌ MongoDB URI not configured properly in .env file');
+            console.error('   Current MONGODB_URI contains placeholder values:');
+            if (mongoUri) {
+                console.error(`   Has <username>: ${mongoUri.includes('<username>')}`);
+                console.error(`   Has <password>: ${mongoUri.includes('<password>')}`);
+                console.error(`   Has <cluster-url>: ${mongoUri.includes('<cluster-url>')}`);
+            }
             console.error('   Please update MONGODB_URI with your MongoDB Atlas credentials');
+            console.error('   OR change CACHE_TYPE to "file" in .env to use local cache');
             throw new Error('MongoDB URI not configured');
         }
 
+        console.log('⏳ Connecting to MongoDB Atlas...');
         await mongoose.connect(mongoUri);
 
         isConnected = true;
         console.log('✅ Successfully connected to MongoDB');
     } catch (error) {
         console.error('❌ MongoDB connection error:', error.message);
+        console.error('💡 Tip: Change CACHE_TYPE to "file" in .env to use local file cache instead');
         throw error;
     }
 }

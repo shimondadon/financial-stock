@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import os from 'os';
 import { getFinancials } from './alphavantage_enhanced.js';
 import { connectDB, getFromCache, getCacheStats, CACHE_TYPE } from './cacheManager.js';
 
@@ -13,6 +14,28 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+/**
+ * Get all network IP addresses of the server
+ */
+function getServerIPs() {
+    const interfaces = os.networkInterfaces();
+    const addresses = [];
+
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            // Skip internal (i.e. 127.0.0.1) and non-IPv4 addresses
+            if (iface.family === 'IPv4' && !iface.internal) {
+                addresses.push({
+                    name: name,
+                    address: iface.address
+                });
+            }
+        }
+    }
+
+    return addresses;
+}
 
 
 // Middleware
@@ -96,9 +119,23 @@ app.get('/api/cache/:symbol/:reportType', async (req, res) => {
 app.listen(PORT, async () => {
     console.log('\n🚀 Alpha Vantage Financial Data Server');
     console.log('=====================================');
-    console.log(`🌐 Server running at: http://localhost:${PORT}`);
-    console.log(`📁 Open your browser and navigate to the URL above`);
-    console.log(`💾 Cache Type: ${CACHE_TYPE === 'mongodb' ? 'MongoDB Cloud' : 'Local Files'}`);
+
+    // Display server URLs
+    console.log(`🌐 Server Access URLs:`);
+    console.log(`   Local:    http://localhost:${PORT}`);
+    console.log(`   Local:    http://127.0.0.1:${PORT}`);
+
+    // Get and display network IPs
+    const serverIPs = getServerIPs();
+    if (serverIPs.length > 0) {
+        serverIPs.forEach(iface => {
+            console.log(`   Network:  http://${iface.address}:${PORT} (${iface.name})`);
+        });
+    } else {
+        console.log(`   Network:  No external network interfaces found`);
+    }
+
+    console.log(`\n💾 Cache Type: ${CACHE_TYPE === 'mongodb' ? 'MongoDB Cloud' : 'Local Files'}`);
 
     // Connect to cache (MongoDB or file system)
     try {
