@@ -1,23 +1,11 @@
 import fetch from 'node-fetch';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { saveToCache, getFromCache } from './cacheManager.js';
 
 // ========================================
 // הגדרות גלובליות
 // ========================================
 const API_KEY = 'TT0O07L0Y7DO2PHV'; // ה-API key שלך
 const BASE_URL = 'https://www.alphavantage.co/query';
-const CACHE_DIR = path.join(__dirname, 'cache');
-
-// Create cache directory if it doesn't exist
-if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-    console.log('📁 Created cache directory');
-}
 
 // ========================================
 // פונקציות עזר (Utility Functions)
@@ -40,111 +28,71 @@ const parseValue = (val) => {
 };
 
 // ========================================
-// ניהול Cache - 5 קבצים נפרדים לכל מניה
+// ניהול Cache - MongoDB במקום קבצים
 // ========================================
 
 /**
- * בדיקה אם כל קבצי ה-cache קיימים ותקפים למניה
+ * בדיקה אם כל הנתונים קיימים ב-MongoDB cache
  * @param {string} symbol - סימבול המניה
  * @returns {Object|null} - הנתונים מה-cache או null
  */
-function getCachedData(symbol) {
-    const files = {
-        income: `income_${symbol}.json`,
-        balance: `balance_${symbol}.json`,
-        cashflow: `cashflow_${symbol}.json`,
-        earnings: `earnings_${symbol}.json`,
-        overview: `overview_${symbol}.json`
-    };
-
+async function getCachedData(symbol) {
     try {
-        // בדיקה שכל הקבצים קיימים
-        const allFilesExist = Object.values(files).every(filename => {
-            return fs.existsSync(path.join(CACHE_DIR, filename));
-        });
+        console.log(`📂 Checking MongoDB cache for ${symbol}...`);
 
-        if (!allFilesExist) {
-            console.log('⚠️ Some cache files missing, will fetch from API...');
+        // טעינת כל 5 סוגי הדוחות מ-MongoDB
+        const [incomeData, balanceData, cashFlowData, earningsData, overviewData] = await Promise.all([
+            getFromCache(symbol, 'income'),
+            getFromCache(symbol, 'balance'),
+            getFromCache(symbol, 'cashflow'),
+            getFromCache(symbol, 'earnings'),
+            getFromCache(symbol, 'overview')
+        ]);
+
+        // בדיקה שכל הנתונים קיימים
+        if (!incomeData || !balanceData || !cashFlowData || !earningsData || !overviewData) {
+            console.log('⚠️ Some cache data missing in MongoDB, will fetch from API...');
             return null;
         }
 
-        // בדיקת תוקף - נבדוק את הקובץ הראשון
-        const firstFilePath = path.join(CACHE_DIR, files.income);
-        const stats = fs.statSync(firstFilePath);
-        const fileAge = Date.now() - stats.mtimeMs;
-        const maxAge = 24 * 60 * 60 * 1000; // 24 שעות
+        console.log('✅ All 5 data types loaded successfully from MongoDB!');
 
-        if (fileAge >= maxAge) {
-            console.log(`⚠️ Cache expired (older than 24 hours), fetching fresh data...`);
-            // מחיקת כל הקבצים הישנים
-            Object.values(files).forEach(filename => {
-                const filepath = path.join(CACHE_DIR, filename);
-                if (fs.existsSync(filepath)) {
-                    fs.unlinkSync(filepath);
-                }
-            });
-            return null;
-        }
-
-        // טעינת כל הקבצים
-        console.log(`📂 Loading cached data for ${symbol}...`);
-        console.log(`⏰ Cache age: ${(fileAge / (60 * 60 * 1000)).toFixed(2)} hours`);
-
-        const cachedData = {
-            incomeData: JSON.parse(fs.readFileSync(path.join(CACHE_DIR, files.income), 'utf8')).data,
-            balanceData: JSON.parse(fs.readFileSync(path.join(CACHE_DIR, files.balance), 'utf8')).data,
-            cashFlowData: JSON.parse(fs.readFileSync(path.join(CACHE_DIR, files.cashflow), 'utf8')).data,
-            earningsData: JSON.parse(fs.readFileSync(path.join(CACHE_DIR, files.earnings), 'utf8')).data,
-            overviewData: JSON.parse(fs.readFileSync(path.join(CACHE_DIR, files.overview), 'utf8')).data
+        return {
+            incomeData,
+            balanceData,
+            cashFlowData,
+            earningsData,
+            overviewData
         };
 
-        console.log('✅ All 5 cache files loaded successfully!');
-        return cachedData;
-
     } catch (err) {
-        console.log(`⚠️ Error reading cache: ${err.message}`);
+        console.log(`⚠️ Error reading MongoDB cache: ${err.message}`);
         return null;
     }
 }
 
 /**
- * שמירת נתונים ל-cache - 5 קבצים נפרדים
+ * שמירת נתונים ל-MongoDB - 5 רשומות נפרדות
  * @param {string} symbol - סימבול המניה
  * @param {Object} rawData - הנתונים הגולמיים מ-API
  */
-function saveDataToCache(symbol, rawData) {
-    console.log(`\n💾 Caching data for ${symbol} to 5 separate files...`);
+async function saveDataToCache(symbol, rawData) {
+    console.log(`\n💾 Caching data for ${symbol} to MongoDB...`);
 
     try {
-        const files = [
-            { name: `income_${symbol}.json`, data: rawData.incomeData },
-            { name: `balance_${symbol}.json`, data: rawData.balanceData },
-            { name: `cashflow_${symbol}.json`, data: rawData.cashFlowData },
-            { name: `earnings_${symbol}.json`, data: rawData.earningsData },
-            { name: `overview_${symbol}.json`, data: rawData.overviewData }
-        ];
+        // שמירה של כל 5 סוגי הדוחות במקביל
+        await Promise.all([
+            saveToCache(symbol, 'income', rawData.incomeData),
+            saveToCache(symbol, 'balance', rawData.balanceData),
+            saveToCache(symbol, 'cashflow', rawData.cashFlowData),
+            saveToCache(symbol, 'earnings', rawData.earningsData),
+            saveToCache(symbol, 'overview', rawData.overviewData)
+        ]);
 
-        let totalSize = 0;
-
-        files.forEach(file => {
-            const filepath = path.join(CACHE_DIR, file.name);
-            const dataToSave = {
-                symbol: symbol,
-                fetchedAt: new Date().toISOString(),
-                data: file.data
-            };
-
-            fs.writeFileSync(filepath, JSON.stringify(dataToSave, null, 2), 'utf8');
-            const fileSize = fs.statSync(filepath).size;
-            totalSize += fileSize;
-            console.log(`  ✓ ${file.name} - ${(fileSize / 1024).toFixed(2)} KB`);
-        });
-
-        console.log(`📦 Total cache size: ${(totalSize / 1024).toFixed(2)} KB`);
-        console.log(`✅ All 5 files cached successfully!\n`);
+        console.log(`✅ All 5 data types cached successfully in MongoDB!\n`);
 
     } catch (err) {
-        console.error(`⚠️ Failed to cache data: ${err.message}`);
+        console.error(`⚠️ Failed to cache data to MongoDB: ${err.message}`);
     }
 }
 
@@ -623,14 +571,14 @@ export async function getFinancials(symbol) {
     try {
         let rawData;
 
-        // בדיקת cache של 5 קבצים נפרדים
-        const cachedData = getCachedData(symbol);
+        // בדיקת cache ב-MongoDB
+        const cachedData = await getCachedData(symbol);
 
         if (cachedData) {
-            console.log('✅ Found cached files! Using cached data and recalculating...');
+            console.log('✅ Found cached data in MongoDB! Using cached data and recalculating...');
             rawData = cachedData;
         } else {
-            console.log('🔄 No cache found, fetching fresh data from API...');
+            console.log('🔄 No cache found in MongoDB, fetching fresh data from API...');
 
             // שלב 1: משיכת כל הנתונים מ-API
             rawData = await fetchAllFinancialData(symbol);
@@ -641,8 +589,8 @@ export async function getFinancials(symbol) {
                 return null;
             }
 
-            // שמירת 5 קבצים נפרדים ל-cache
-            saveDataToCache(symbol, rawData);
+            // שמירה ל-MongoDB
+            await saveDataToCache(symbol, rawData);
         }
 
         console.log('\n=== ENHANCED FINANCIAL STATEMENTS ===');

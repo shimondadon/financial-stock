@@ -470,6 +470,27 @@
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
         }
+
+        .download-cache-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .download-cache-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(52, 152, 219, 0.3);
+        }
+
+        .download-cache-btn:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -550,8 +571,16 @@
 
         <!-- Download Button -->
         <div class="download-section">
+            <h4 style="color: #667eea; margin-bottom: 15px;">💾 Download Options</h4>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 15px;">
+                <button onclick="downloadCacheFile('income')" class="download-cache-btn">📊 Income Statement</button>
+                <button onclick="downloadCacheFile('balance')" class="download-cache-btn">🏦 Balance Sheet</button>
+                <button onclick="downloadCacheFile('cashflow')" class="download-cache-btn">💵 Cash Flow</button>
+                <button onclick="downloadCacheFile('earnings')" class="download-cache-btn">📈 Earnings</button>
+                <button onclick="downloadCacheFile('overview')" class="download-cache-btn">🏢 Company Overview</button>
+            </div>
             <button id="downloadBtn" onclick="downloadJSON()" class="download-json-btn">
-                💾 Download Full JSON Report
+                💾 Download Full Combined Report
             </button>
         </div>
     </div>
@@ -938,6 +967,26 @@
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+        }
+
+        function downloadCacheFile(reportType) {
+            if (!currentData) {
+                showStatus('⚠️ No data loaded. Please fetch financial data first.', 'error');
+                return;
+            }
+
+            const symbol = currentData.symbol;
+            const url = `/api/cache/${symbol}/${reportType}`;
+
+            // Create temporary link and click it
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${reportType}_${symbol}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            showStatus(`✅ Downloading ${reportType} report...`, 'success');
         }
 
         form.addEventListener('submit', async (e) => {
