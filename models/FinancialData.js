@@ -31,9 +31,9 @@ const financialDataSchema = new mongoose.Schema({
 financialDataSchema.index({ symbol: 1, reportType: 1 }, { unique: true });
 
 // TTL index to automatically delete old data after specified time
-// This will be set based on CACHE_EXPIRATION_HOURS
+// This will be set based on CACHE_EXPIRATION_HOURS (default: 720 hours = 30 days)
 financialDataSchema.index({ createdAt: 1 }, {
-    expireAfterSeconds: parseInt(process.env.CACHE_EXPIRATION_HOURS || 24) * 3600
+    expireAfterSeconds: parseInt(process.env.CACHE_EXPIRATION_HOURS || 720) * 3600
 });
 
 // Update the updatedAt timestamp before saving

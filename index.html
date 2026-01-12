@@ -513,6 +513,18 @@
                 >
             </div>
 
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+                    <input
+                        type="checkbox"
+                        id="useDbOnly"
+                        name="useDbOnly"
+                        style="width: 20px; height: 20px; margin-right: 10px; cursor: pointer;"
+                    >
+                    <span style="font-weight: 500;">📂 Use cached data from DB only (skip API)</span>
+                </label>
+            </div>
+
             <button type="submit" id="submitBtn">
                 Fetch Financial Data
             </button>
@@ -1037,6 +1049,7 @@
             e.preventDefault();
 
             const symbol = symbolInput.value.trim().toUpperCase();
+            const useDbOnly = document.getElementById('useDbOnly').checked;
 
             if (!symbol) {
                 showStatus('Please enter a stock symbol', 'error');
@@ -1049,13 +1062,19 @@
             hideStatus();
 
             try {
-                showStatus('⏳ Checking for cached data...', 'info');
+                if (useDbOnly) {
+                    showStatus('⏳ Loading data from database cache only...', 'info');
+                } else {
+                    showStatus('⏳ Checking for cached data...', 'info');
+                }
 
                 const startTime = Date.now();
 
                 // Set a timeout to update message if taking longer (means fetching from API)
                 const progressTimeout = setTimeout(() => {
-                    showStatus('⏳ Fetching fresh data from API... This will take 60-90 seconds due to rate limits.', 'info');
+                    if (!useDbOnly) {
+                        showStatus('⏳ Fetching fresh data from API... This will take 60-90 seconds due to rate limits.', 'info');
+                    }
                 }, 3000);
 
                 const response = await fetch('/api/financials', {
@@ -1063,7 +1082,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ symbol })
+                    body: JSON.stringify({ symbol, useDbOnly })
                 });
 
                 clearTimeout(progressTimeout);
@@ -1090,7 +1109,9 @@
                 document.getElementById('resultsContainer').style.display = 'block';
                 document.getElementById('resultsContainer').scrollIntoView({ behavior: 'smooth' });
 
-                if (isCached) {
+                if (useDbOnly) {
+                    showStatus(`✅ Success! Data loaded from database cache`, 'success');
+                } else if (isCached) {
                     showStatus(`✅ Success! Data loaded from today's cache`, 'success');
                 } else {
                     showStatus(`✅ Success! Fresh data fetched from API`, 'success');

@@ -4,7 +4,12 @@ import { saveToCache, getFromCache } from './cacheManager.js';
 // ========================================
 // הגדרות גלובליות
 // ========================================
-const API_KEY = 'TT0O07L0Y7DO2PHV'; // ה-API key שלך
+const API_KEY1 = 'TT0O07L0Y7DO2PHV'; // ה-API key שלך
+const API_KEY2 = 'WCP77UX1RF7O4MSG'; // ה-API key שלך
+const API_KEY3 = 'XAN8JQ0KV40DRKUO'; // ה-API key שלך
+const API_KEY4 = '73DEDQ2T9NQD96QG'; // ה-API key שלך
+const API_KEY5 = 'MZCCU2PIV56DC6RB'; // ה-API key שלך
+const API_KEY6 = 'OZU0A7HK5EN21J13'; // ה-API key שלך
 const BASE_URL = 'https://www.alphavantage.co/query';
 
 // ========================================
@@ -36,7 +41,7 @@ const parseValue = (val) => {
  * @param {string} symbol - סימבול המניה
  * @returns {Object|null} - הנתונים מה-cache או null
  */
-async function getCachedData(symbol) {
+export async function getCachedData(symbol) {
     try {
         console.log(`📂 Checking MongoDB cache for ${symbol}...`);
 
@@ -111,7 +116,7 @@ async function fetchAllFinancialData(symbol) {
     // קבלת Income Statement
     console.log('Fetching Income Statement...', `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY}`);
     const incomeResponse = await fetch(
-        `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY}`
+        `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY6}`
     );
     const incomeData = await incomeResponse.json();
     await delay(13000);
@@ -119,7 +124,7 @@ async function fetchAllFinancialData(symbol) {
     // קבלת Balance Sheet
     console.log('Fetching Balance Sheet...');
     const balanceResponse = await fetch(
-        `${BASE_URL}?function=BALANCE_SHEET&symbol=${symbol}&apikey=${API_KEY}`
+        `${BASE_URL}?function=BALANCE_SHEET&symbol=${symbol}&apikey=${API_KEY2}`
     );
     const balanceData = await balanceResponse.json();
     await delay(13000);
@@ -127,7 +132,7 @@ async function fetchAllFinancialData(symbol) {
     // קבלת Cash Flow
     console.log('Fetching Cash Flow...');
     const cashFlowResponse = await fetch(
-        `${BASE_URL}?function=CASH_FLOW&symbol=${symbol}&apikey=${API_KEY}`
+        `${BASE_URL}?function=CASH_FLOW&symbol=${symbol}&apikey=${API_KEY3}`
     );
     const cashFlowData = await cashFlowResponse.json();
     await delay(13000);
@@ -135,7 +140,7 @@ async function fetchAllFinancialData(symbol) {
     // קבלת Earnings
     console.log('Fetching Earnings...');
     const earningsResponse = await fetch(
-        `${BASE_URL}?function=EARNINGS&symbol=${symbol}&apikey=${API_KEY}`
+        `${BASE_URL}?function=EARNINGS&symbol=${symbol}&apikey=${API_KEY4}`
     );
     const earningsData = await earningsResponse.json();
     await delay(13000);
@@ -143,7 +148,7 @@ async function fetchAllFinancialData(symbol) {
     // קבלת Company Overview
     console.log('Fetching Company Overview...');
     const overviewResponse = await fetch(
-        `${BASE_URL}?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY}`
+        `${BASE_URL}?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY5}`
     );
     const overviewData = await overviewResponse.json();
 
@@ -565,9 +570,10 @@ function printMetricsSummary(enhancedReports) {
 /**
  * פונקציה ראשית למשיכת וניתוח נתונים פיננסיים
  * @param {string} symbol - סימבול המניה
+ * @param {boolean} skipApiIfNotCached - האם לדלג על API אם אין cache
  * @returns {Promise<Object|null>} - הנתונים המלאים או null במקרה של שגיאה
  */
-export async function getFinancials(symbol) {
+export async function getFinancials(symbol, skipApiIfNotCached = false) {
     try {
         let rawData;
 
@@ -578,6 +584,11 @@ export async function getFinancials(symbol) {
             console.log('✅ Found cached data in MongoDB! Using cached data and recalculating...');
             rawData = cachedData;
         } else {
+            if (skipApiIfNotCached) {
+                console.log('⚠️ No cache found and skipApiIfNotCached=true, returning null');
+                return null;
+            }
+
             console.log('🔄 No cache found in MongoDB, fetching fresh data from API...');
 
             // שלב 1: משיכת כל הנתונים מ-API

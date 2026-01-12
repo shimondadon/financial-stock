@@ -89,7 +89,7 @@ export async function getFromCache(symbol, reportType) {
 
         if (result) {
             // Check if cache is still valid (within expiration time)
-            const expirationHours = parseInt(process.env.CACHE_EXPIRATION_HOURS || 24);
+            const expirationHours = parseInt(process.env.CACHE_EXPIRATION_HOURS || 720); // 720 hours = 30 days
             const expirationTime = expirationHours * 60 * 60 * 1000; // Convert to milliseconds
             const cacheAge = Date.now() - result.createdAt.getTime();
 
@@ -127,7 +127,7 @@ export async function isCacheValid(symbol, reportType) {
 
         if (!result) return false;
 
-        const expirationHours = parseInt(process.env.CACHE_EXPIRATION_HOURS || 24);
+        const expirationHours = parseInt(process.env.CACHE_EXPIRATION_HOURS || 720); // 720 hours = 30 days
         const expirationTime = expirationHours * 60 * 60 * 1000;
         const cacheAge = Date.now() - result.createdAt.getTime();
 

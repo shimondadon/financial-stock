@@ -50,7 +50,7 @@ app.get('/', (req, res) => {
 // API endpoint to fetch financial data
 app.post('/api/financials', async (req, res) => {
     try {
-        const { symbol } = req.body;
+        const { symbol, useDbOnly = false } = req.body;
 
         if (!symbol) {
             return res.status(400).json({ error: 'Symbol is required' });
@@ -63,14 +63,22 @@ app.post('/api/financials', async (req, res) => {
 
         const upperSymbol = symbol.toUpperCase();
         console.log(`\n📊 Processing request for symbol: ${upperSymbol}`);
+        console.log(`📂 Use DB Only mode: ${useDbOnly}`);
 
         // getFinancials handles cache checking automatically
-        const data = await getFinancials(upperSymbol);
+        // If useDbOnly is true, it will skip API call if cache not found
+        const data = await getFinancials(upperSymbol, useDbOnly);
 
         if (!data) {
-            return res.status(500).json({
-                error: 'Failed to fetch financial data. Please check the symbol and try again.'
-            });
+            if (useDbOnly) {
+                return res.status(404).json({
+                    error: `No cached data found for ${upperSymbol}. Please uncheck "Use cached data from DB only" to fetch from API.`
+                });
+            } else {
+                return res.status(500).json({
+                    error: 'Failed to fetch financial data. Please check the symbol and try again.'
+                });
+            }
         }
 
         // Send data as JSON

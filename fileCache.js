@@ -54,7 +54,7 @@ export async function getFromCache(symbol, reportType) {
 
         const stats = fs.statSync(filepath);
         const fileAge = Date.now() - stats.mtimeMs;
-        const expirationHours = parseInt(process.env.CACHE_EXPIRATION_HOURS || 24);
+        const expirationHours = parseInt(process.env.CACHE_EXPIRATION_HOURS || 720); // 720 hours = 30 days
         const expirationTime = expirationHours * 60 * 60 * 1000;
 
         if (fileAge > expirationTime) {
@@ -90,7 +90,7 @@ export async function isCacheValid(symbol, reportType) {
 
         const stats = fs.statSync(filepath);
         const fileAge = Date.now() - stats.mtimeMs;
-        const expirationHours = parseInt(process.env.CACHE_EXPIRATION_HOURS || 24);
+        const expirationHours = parseInt(process.env.CACHE_EXPIRATION_HOURS || 720); // 720 hours = 30 days
         const expirationTime = expirationHours * 60 * 60 * 1000;
 
         return fileAge <= expirationTime;
