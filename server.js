@@ -50,7 +50,7 @@ app.get('/', (req, res) => {
 // API endpoint to fetch financial data
 app.post('/api/financials', async (req, res) => {
     try {
-        const { symbol, useDbOnly = false } = req.body;
+        const { symbol, useDbOnly = false, forceApiRefresh = false } = req.body;
 
         if (!symbol) {
             return res.status(400).json({ error: 'Symbol is required' });
@@ -64,10 +64,12 @@ app.post('/api/financials', async (req, res) => {
         const upperSymbol = symbol.toUpperCase();
         console.log(`\n📊 Processing request for symbol: ${upperSymbol}`);
         console.log(`📂 Use DB Only mode: ${useDbOnly}`);
+        console.log(`🔄 Force API Refresh mode: ${forceApiRefresh}`);
 
         // getFinancials handles cache checking automatically
         // If useDbOnly is true, it will skip API call if cache not found
-        const data = await getFinancials(upperSymbol, useDbOnly);
+        // If forceApiRefresh is true, it will always fetch from API and update cache
+        const data = await getFinancials(upperSymbol, useDbOnly, forceApiRefresh);
 
         if (!data) {
             if (useDbOnly) {
@@ -172,6 +174,6 @@ app.listen(PORT, async () => {
 
     console.log(`\n⚠️  Note: Free API key allows 5 requests per minute`);
     console.log(`    Each request takes ~60-90 seconds due to API rate limits`);
-    console.log(`✨  Cached data (less than 24 hours old) will be served instantly\n`);
+    console.log(`✨  Cached data (less than 1 mount old) will be served instantly\n`);
 });
 

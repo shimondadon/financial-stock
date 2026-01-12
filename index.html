@@ -513,15 +513,29 @@
                 >
             </div>
 
-            <div class="form-group" style="margin-bottom: 20px;">
+            <div class="form-group" style="margin-bottom: 15px;">
                 <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
                     <input
                         type="checkbox"
                         id="useDbOnly"
                         name="useDbOnly"
                         style="width: 20px; height: 20px; margin-right: 10px; cursor: pointer;"
+                        onchange="handleCheckboxChange('useDbOnly')"
                     >
                     <span style="font-weight: 500;">📂 Use cached data from DB only (skip API)</span>
+                </label>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+                    <input
+                        type="checkbox"
+                        id="forceApiRefresh"
+                        name="forceApiRefresh"
+                        style="width: 20px; height: 20px; margin-right: 10px; cursor: pointer;"
+                        onchange="handleCheckboxChange('forceApiRefresh')"
+                    >
+                    <span style="font-weight: 500;">🔄 Force API refresh (ignore cache)</span>
                 </label>
             </div>
 
@@ -604,6 +618,18 @@
         const symbolInput = document.getElementById('symbol');
         let currentData = null;
         let currentReportType = 'annual'; // 'annual' or 'quarterly'
+
+        // פונקציה למניעת בחירה משותפת של שני ה-checkboxes
+        function handleCheckboxChange(changedCheckbox) {
+            const useDbOnly = document.getElementById('useDbOnly');
+            const forceApiRefresh = document.getElementById('forceApiRefresh');
+
+            if (changedCheckbox === 'useDbOnly' && useDbOnly.checked) {
+                forceApiRefresh.checked = false;
+            } else if (changedCheckbox === 'forceApiRefresh' && forceApiRefresh.checked) {
+                useDbOnly.checked = false;
+            }
+        }
 
         function setSymbol(symbol) {
             symbolInput.value = symbol;
@@ -1050,6 +1076,7 @@
 
             const symbol = symbolInput.value.trim().toUpperCase();
             const useDbOnly = document.getElementById('useDbOnly').checked;
+            const forceApiRefresh = document.getElementById('forceApiRefresh').checked;
 
             if (!symbol) {
                 showStatus('Please enter a stock symbol', 'error');
@@ -1064,6 +1091,8 @@
             try {
                 if (useDbOnly) {
                     showStatus('⏳ Loading data from database cache only...', 'info');
+                } else if (forceApiRefresh) {
+                    showStatus('⏳ Forcing fresh data from API (ignoring cache)...', 'info');
                 } else {
                     showStatus('⏳ Checking for cached data...', 'info');
                 }
@@ -1082,7 +1111,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ symbol, useDbOnly })
+                    body: JSON.stringify({ symbol, useDbOnly, forceApiRefresh })
                 });
 
                 clearTimeout(progressTimeout);
@@ -1111,8 +1140,10 @@
 
                 if (useDbOnly) {
                     showStatus(`✅ Success! Data loaded from database cache`, 'success');
+                } else if (forceApiRefresh) {
+                    showStatus(`✅ Success! Fresh data fetched from API (cache ignored)`, 'success');
                 } else if (isCached) {
-                    showStatus(`✅ Success! Data loaded from today's cache`, 'success');
+                    showStatus(`✅ Success! Data loaded from cache`, 'success');
                 } else {
                     showStatus(`✅ Success! Fresh data fetched from API`, 'success');
                 }

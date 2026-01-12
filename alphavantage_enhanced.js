@@ -114,7 +114,7 @@ async function fetchAllFinancialData(symbol) {
     console.log(`Fetching financial data for ${symbol}...`);
 
     // קבלת Income Statement
-    console.log('Fetching Income Statement...', `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY}`);
+    console.log('Fetching Income Statement...', `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY2}`);
     const incomeResponse = await fetch(
         `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY6}`
     );
@@ -571,25 +571,16 @@ function printMetricsSummary(enhancedReports) {
  * פונקציה ראשית למשיכת וניתוח נתונים פיננסיים
  * @param {string} symbol - סימבול המניה
  * @param {boolean} skipApiIfNotCached - האם לדלג על API אם אין cache
+ * @param {boolean} forceApiRefresh - האם לכפות משיכה מה-API גם אם יש cache
  * @returns {Promise<Object|null>} - הנתונים המלאים או null במקרה של שגיאה
  */
-export async function getFinancials(symbol, skipApiIfNotCached = false) {
+export async function getFinancials(symbol, skipApiIfNotCached = false, forceApiRefresh = false) {
     try {
         let rawData;
 
-        // בדיקת cache ב-MongoDB
-        const cachedData = await getCachedData(symbol);
-
-        if (cachedData) {
-            console.log('✅ Found cached data in MongoDB! Using cached data and recalculating...');
-            rawData = cachedData;
-        } else {
-            if (skipApiIfNotCached) {
-                console.log('⚠️ No cache found and skipApiIfNotCached=true, returning null');
-                return null;
-            }
-
-            console.log('🔄 No cache found in MongoDB, fetching fresh data from API...');
+        // אם forceApiRefresh=true, דלג על בדיקת cache ומשוך ישירות מה-API
+        if (forceApiRefresh) {
+            console.log('🔄 Force API Refresh mode - skipping cache check, fetching from API...');
 
             // שלב 1: משיכת כל הנתונים מ-API
             rawData = await fetchAllFinancialData(symbol);
@@ -600,8 +591,36 @@ export async function getFinancials(symbol, skipApiIfNotCached = false) {
                 return null;
             }
 
-            // שמירה ל-MongoDB
+            // שמירה/עדכון ב-MongoDB
             await saveDataToCache(symbol, rawData);
+
+        } else {
+            // בדיקת cache ב-MongoDB
+            const cachedData = await getCachedData(symbol);
+
+            if (cachedData) {
+                console.log('✅ Found cached data in MongoDB! Using cached data and recalculating...');
+                rawData = cachedData;
+            } else {
+                if (skipApiIfNotCached) {
+                    console.log('⚠️ No cache found and skipApiIfNotCached=true, returning null');
+                    return null;
+                }
+
+                console.log('🔄 No cache found in MongoDB, fetching fresh data from API...');
+
+                // שלב 1: משיכת כל הנתונים מ-API
+                rawData = await fetchAllFinancialData(symbol);
+
+                // שלב 2: בדיקת שגיאות
+                const hasErrors = checkForErrors(rawData);
+                if (hasErrors) {
+                    return null;
+                }
+
+                // שמירה ל-MongoDB
+                await saveDataToCache(symbol, rawData);
+            }
         }
 
         console.log('\n=== ENHANCED FINANCIAL STATEMENTS ===');
