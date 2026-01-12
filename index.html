@@ -614,15 +614,59 @@
 
         function formatNumber(value, decimals = 2) {
             if (value === null || value === undefined || isNaN(value)) return 'N/A';
-            return Number(value).toFixed(decimals);
+
+            const num = Number(value);
+            const absNum = Math.abs(num);
+
+            // For numbers that are already percentages or ratios (small numbers), keep as is
+            if (absNum < 1000) {
+                return num.toFixed(decimals);
+            }
+
+            // Format with K, M, B, T
+            if (absNum >= 1e12) {
+                // Trillion
+                const formatted = (num / 1e12).toFixed(decimals);
+                return `${formatted}T`;
+            } else if (absNum >= 1e9) {
+                // Billion
+                const formatted = (num / 1e9).toFixed(decimals);
+                return `${formatted}B`;
+            } else if (absNum >= 1e6) {
+                // Million
+                const formatted = (num / 1e6).toFixed(decimals);
+                return `${formatted}M`;
+            } else if (absNum >= 1e3) {
+                // Thousand
+                const formatted = (num / 1e3).toFixed(decimals);
+                return `${formatted}K`;
+            }
+
+            return num.toFixed(decimals);
         }
 
         function formatCurrency(value, inBillions = true) {
             if (value === null || value === undefined || isNaN(value)) return 'N/A';
-            if (inBillions) {
-                return `$${(value / 1e9).toFixed(2)}B`;
+
+            const num = Number(value);
+            const absNum = Math.abs(num);
+
+            // Auto-detect best unit
+            if (absNum >= 1e12) {
+                // Trillion
+                return `$${(num / 1e12).toFixed(2)}T`;
+            } else if (absNum >= 1e9) {
+                // Billion
+                return `$${(num / 1e9).toFixed(2)}B`;
+            } else if (absNum >= 1e6) {
+                // Million
+                return `$${(num / 1e6).toFixed(2)}M`;
+            } else if (absNum >= 1e3) {
+                // Thousand
+                return `$${(num / 1e3).toFixed(2)}K`;
             }
-            return `$${Number(value).toLocaleString()}`;
+
+            return `$${num.toFixed(2)}`;
         }
 
         function formatPercent(value) {

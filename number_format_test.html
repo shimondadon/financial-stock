@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Format Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #667eea;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #f5f5f5;
+        }
+        .old-format {
+            color: #999;
+            font-size: 0.9em;
+        }
+        .new-format {
+            color: #667eea;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Number Format Test - Before & After</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Original Value</th>
+                    <th>Old Format</th>
+                    <th>New Format (K/M/B/T)</th>
+                </tr>
+            </thead>
+            <tbody id="testResults"></tbody>
+        </table>
+    </div>
+
+    <script>
+        // Old format function
+        function formatNumberOld(value, decimals = 2) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+            return Number(value).toFixed(decimals);
+        }
+
+        function formatCurrencyOld(value) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+            return `$${(value / 1e9).toFixed(2)}B`;
+        }
+
+        // New format functions
+        function formatNumber(value, decimals = 2) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+
+            const num = Number(value);
+            const absNum = Math.abs(num);
+
+            if (absNum < 1000) {
+                return num.toFixed(decimals);
+            }
+
+            if (absNum >= 1e12) {
+                const formatted = (num / 1e12).toFixed(decimals);
+                return `${formatted}T`;
+            } else if (absNum >= 1e9) {
+                const formatted = (num / 1e9).toFixed(decimals);
+                return `${formatted}B`;
+            } else if (absNum >= 1e6) {
+                const formatted = (num / 1e6).toFixed(decimals);
+                return `${formatted}M`;
+            } else if (absNum >= 1e3) {
+                const formatted = (num / 1e3).toFixed(decimals);
+                return `${formatted}K`;
+            }
+
+            return num.toFixed(decimals);
+        }
+
+        function formatCurrency(value) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+
+            const num = Number(value);
+            const absNum = Math.abs(num);
+
+            if (absNum >= 1e12) {
+                return `$${(num / 1e12).toFixed(2)}T`;
+            } else if (absNum >= 1e9) {
+                return `$${(num / 1e9).toFixed(2)}B`;
+            } else if (absNum >= 1e6) {
+                return `$${(num / 1e6).toFixed(2)}M`;
+            } else if (absNum >= 1e3) {
+                return `$${(num / 1e3).toFixed(2)}K`;
+            }
+
+            return `$${num.toFixed(2)}`;
+        }
+
+        // Test cases
+        const testCases = [
+            { value: 1234567890123, label: 'Revenue (Trillion)' },
+            { value: 45678900000, label: 'Market Cap (Billion)' },
+            { value: 1234567890, label: 'Net Income (Billion)' },
+            { value: 850000000, label: 'Cash (Million)' },
+            { value: 125000000, label: 'Assets (Million)' },
+            { value: 5500000, label: 'Operating Income (Million)' },
+            { value: 250000, label: 'Small Value (Thousand)' },
+            { value: 850, label: 'Very Small (Units)' },
+            { value: 3.45, label: 'Ratio' },
+            { value: 0.125, label: 'Decimal' },
+            { value: -2500000000, label: 'Negative (Billion)' },
+        ];
+
+        // Generate test results
+        const tbody = document.getElementById('testResults');
+        testCases.forEach(test => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${test.label}</strong><br>${test.value.toLocaleString()}</td>
+                <td class="old-format">${formatCurrencyOld(test.value)}</td>
+                <td class="new-format">${formatCurrency(test.value)}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    </script>
+</body>
+</html>
+
