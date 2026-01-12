@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import os from 'os';
-import { getFinancials } from './alphavantage_enhanced.js';
+import { getFinancials, getApiLockStatus } from './alphavantage_enhanced.js';
 import { connectDB, getFromCache, getCacheStats, CACHE_TYPE } from './cacheManager.js';
 
 // Load environment variables
@@ -122,6 +122,31 @@ app.get('/api/cache/:symbol/:reportType', async (req, res) => {
     } catch (error) {
         console.error('Download error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// API endpoint to check API lock status
+app.get('/api/status', (req, res) => {
+    try {
+        const status = getApiLockStatus();
+        res.json({
+            success: true,
+            api: {
+                isLocked: status.isLocked,
+                currentSymbol: status.currentSymbol,
+                queueLength: status.queueLength,
+                queuedSymbols: status.queuedSymbols,
+                cooldownRemaining: Math.ceil(status.cooldownRemaining / 1000), // seconds
+                available: !status.isLocked && status.cooldownRemaining === 0
+            },
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error getting API status:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get API status'
+        });
     }
 });
 

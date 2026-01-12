@@ -631,6 +631,22 @@
             }
         }
 
+        // פונקציה לבדיקת סטטוס API
+        async function checkApiStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                if (data.success && data.api) {
+                    return data.api;
+                }
+                return null;
+            } catch (error) {
+                console.error('Error checking API status:', error);
+                return null;
+            }
+        }
+
         function setSymbol(symbol) {
             symbolInput.value = symbol;
             symbolInput.focus();
@@ -1089,6 +1105,25 @@
             hideStatus();
 
             try {
+                // בדיקת סטטוס API רק אם נדרש API call (לא במצב useDbOnly)
+                if (!useDbOnly) {
+                    const apiStatus = await checkApiStatus();
+                    if (apiStatus && apiStatus.isLocked) {
+                        const queueInfo = apiStatus.queueLength > 0
+                            ? ` ${apiStatus.queueLength} request(s) in queue.`
+                            : '';
+                        showStatus(
+                            `⏳ API is currently processing "${apiStatus.currentSymbol}".${queueInfo} Your request will be processed automatically. Please wait...`,
+                            'info'
+                        );
+                    } else if (apiStatus && apiStatus.cooldownRemaining > 0) {
+                        showStatus(
+                            `⏰ API cooldown active: ${apiStatus.cooldownRemaining}s remaining. Your request will start automatically...`,
+                            'info'
+                        );
+                    }
+                }
+
                 if (useDbOnly) {
                     showStatus('⏳ Loading data from database cache only...', 'info');
                 } else if (forceApiRefresh) {

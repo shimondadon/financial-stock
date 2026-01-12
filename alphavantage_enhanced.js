@@ -13,6 +13,82 @@ const API_KEY6 = 'OZU0A7HK5EN21J13'; // ה-API key שלך
 const BASE_URL = 'https://www.alphavantage.co/query';
 
 // ========================================
+// מנגנון נעילה למניעת קריאות API מקבילות
+// ========================================
+let isApiFetching = false;
+let currentFetchingSymbol = null;
+let apiLockQueue = [];
+let lastApiCallEndTime = null;
+const API_COOLDOWN_MS = 14000; // 14 שניות cooldown אחרי כל משיכה
+
+/**
+ * המתנה לתור עד שאפשר לקרוא ל-API
+ * @param {string} symbol - סימבול המניה
+ * @returns {Promise<void>}
+ */
+async function waitForApiAvailability(symbol) {
+    return new Promise((resolve) => {
+        // בדיקה אם צריך להמתין ל-cooldown
+        const checkAvailability = () => {
+            // אם ה-API תפוס
+            if (isApiFetching) {
+                console.log(`⏳ API is busy fetching data for "${currentFetchingSymbol}". Symbol "${symbol}" is waiting in queue...`);
+                console.log(`📊 Queue position: ${apiLockQueue.length + 1}`);
+                apiLockQueue.push({ symbol, resolve, timestamp: Date.now() });
+                return;
+            }
+
+            // אם יש cooldown פעיל
+            if (lastApiCallEndTime) {
+                const timeSinceLastCall = Date.now() - lastApiCallEndTime;
+                const remainingCooldown = API_COOLDOWN_MS - timeSinceLastCall;
+
+                if (remainingCooldown > 0) {
+                    console.log(`⏰ Cooldown active: ${Math.ceil(remainingCooldown / 1000)}s remaining. Symbol "${symbol}" is waiting...`);
+                    setTimeout(checkAvailability, remainingCooldown);
+                    return;
+                }
+            }
+
+            // API זמין!
+            isApiFetching = true;
+            currentFetchingSymbol = symbol;
+            console.log(`✅ API is now available for "${symbol}"`);
+            resolve();
+        };
+
+        checkAvailability();
+    });
+}
+
+/**
+ * שחרור הנעילה וטיפול בתור
+ */
+function releaseApiLock() {
+    console.log(`🔓 API lock released for "${currentFetchingSymbol}"`);
+    isApiFetching = false;
+    currentFetchingSymbol = null;
+    lastApiCallEndTime = Date.now();
+
+    // טיפול במשתמש הבא בתור
+    if (apiLockQueue.length > 0) {
+        const waitTime = Math.ceil((Date.now() - apiLockQueue[0].timestamp) / 1000);
+        console.log(`👥 Processing next in queue (waited ${waitTime}s)...`);
+
+        setTimeout(() => {
+            const next = apiLockQueue.shift();
+            console.log(`⏭️ Starting fetch for "${next.symbol}" from queue`);
+
+            isApiFetching = true;
+            currentFetchingSymbol = next.symbol;
+            next.resolve();
+        }, API_COOLDOWN_MS);
+    } else {
+        console.log(`✨ Queue is empty. API will be available in ${API_COOLDOWN_MS / 1000}s`);
+    }
+}
+
+// ========================================
 // פונקציות עזר (Utility Functions)
 // ========================================
 
@@ -111,18 +187,23 @@ async function saveDataToCache(symbol, rawData) {
  * @returns {Promise<Object>} - אובייקט עם כל הנתונים הגולמיים
  */
 async function fetchAllFinancialData(symbol) {
-    console.log(`Fetching financial data for ${symbol}...`);
+    // המתנה עד שה-API זמין
+    await waitForApiAvailability(symbol);
 
-    // קבלת Income Statement
-    console.log('Fetching Income Statement...', `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY2}`);
-    const incomeResponse = await fetch(
-        `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY6}`
-    );
-    const incomeData = await incomeResponse.json();
-    await delay(13000);
+    try {
+        console.log(`🚀 Starting API fetch for ${symbol}...`);
+        console.log(`⏱️ Estimated time: ~65 seconds (5 API calls with 13s delays)`);
 
-    // קבלת Balance Sheet
-    console.log('Fetching Balance Sheet...');
+        // קבלת Income Statement
+        console.log('Fetching Income Statement...', `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY2}`);
+        const incomeResponse = await fetch(
+            `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY6}`
+        );
+        const incomeData = await incomeResponse.json();
+        await delay(13000);
+
+        // קבלת Balance Sheet
+        console.log('Fetching Balance Sheet...');
     const balanceResponse = await fetch(
         `${BASE_URL}?function=BALANCE_SHEET&symbol=${symbol}&apikey=${API_KEY2}`
     );
@@ -145,20 +226,29 @@ async function fetchAllFinancialData(symbol) {
     const earningsData = await earningsResponse.json();
     await delay(13000);
 
-    // קבלת Company Overview
-    console.log('Fetching Company Overview...');
-    const overviewResponse = await fetch(
-        `${BASE_URL}?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY5}`
-    );
-    const overviewData = await overviewResponse.json();
+        // קבלת Company Overview
+        console.log('Fetching Company Overview...');
+        const overviewResponse = await fetch(
+            `${BASE_URL}?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY5}`
+        );
+        const overviewData = await overviewResponse.json();
 
-    return {
-        incomeData,
-        balanceData,
-        cashFlowData,
-        earningsData,
-        overviewData
-    };
+        console.log(`✅ Successfully fetched all data for ${symbol}`);
+
+        return {
+            incomeData,
+            balanceData,
+            cashFlowData,
+            earningsData,
+            overviewData
+        };
+    } catch (error) {
+        console.error(`❌ Error fetching data for ${symbol}:`, error.message);
+        throw error;
+    } finally {
+        // שחרור הנעילה ללא קשר להצלחה או כישלון
+        releaseApiLock();
+    }
 }
 
 /**
@@ -678,6 +768,20 @@ export async function getFinancials(symbol, skipApiIfNotCached = false, forceApi
 // ========================================
 // הרצת התוכנית
 // ========================================
+
+// Export API lock status functions for server monitoring
+export function getApiLockStatus() {
+    return {
+        isLocked: isApiFetching,
+        currentSymbol: currentFetchingSymbol,
+        queueLength: apiLockQueue.length,
+        queuedSymbols: apiLockQueue.map(item => item.symbol),
+        lastCallEndTime: lastApiCallEndTime,
+        cooldownRemaining: lastApiCallEndTime
+            ? Math.max(0, API_COOLDOWN_MS - (Date.now() - lastApiCallEndTime))
+            : 0
+    };
+}
 
 // Run directly from command line (uncomment to use):
 // console.log('Alpha Vantage Enhanced Financial Data Fetcher');
