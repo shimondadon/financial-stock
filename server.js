@@ -249,10 +249,10 @@ app.get('/api/export/excel', async (req, res) => {
             console.log(`  ✓ Processed: ${symbol}`);
         });
 
-        // Create the consolidated sheet
-        const consolidatedSheet = XLSX.utils.json_to_sheet(consolidatedRows);
+        // Create the consolidated sheet - start data at row 3, skip automatic headers
+        const consolidatedSheet = XLSX.utils.json_to_sheet(consolidatedRows, { origin: 'A3', skipHeader: true });
 
-        // Insert grouped headers at the top
+        // Insert grouped category headers at the top (row 1)
         XLSX.utils.sheet_add_aoa(consolidatedSheet, [[
             '', '', // Empty for Symbol, Year columns
             'Income Statement', '', '', '', '', '', // Spans 6 columns (C-H)
@@ -261,6 +261,23 @@ app.get('/api/export/excel', async (req, res) => {
             'Metrics', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // Spans 15 columns (U-AI)
             'Company Info', '', '', '', '', '' // Spans 6 columns (AJ-AO)
         ]], { origin: 'A1' });
+
+        // Insert field names in row 2
+        XLSX.utils.sheet_add_aoa(consolidatedSheet, [[
+            'Symbol', 'Year',
+            // Income Statement
+            'Total_Revenue', 'Gross_Profit', 'Operating_Income', 'Net_Income', 'EBITDA', 'EPS',
+            // Balance Sheet
+            'Total_Assets', 'Current_Assets', 'Total_Liabilities', 'Current_Liabilities', 'Long_Term_Debt', 'Shareholder_Equity',
+            // Cash Flow
+            'Cash_Equivalents', 'Operating_Cash_Flow', 'Capital_Expenditures', 'Free_Cash_Flow', 'Investing_Cash_Flow', 'Financing_Cash_Flow',
+            // Metrics
+            'Gross_Profit_Margin', 'Operating_Margin', 'Net_Profit_Margin', 'ROA', 'ROE', 'EBITDA_Margin',
+            'Current_Ratio', 'Quick_Ratio', 'Debt_to_Equity', 'Debt_to_Assets', 'Asset_Turnover',
+            'Revenue_Growth_YoY', 'Net_Income_Growth_YoY', 'EPS_Growth_YoY',
+            // Company Info
+            'Company_Name', 'Sector', 'Industry', 'Market_Cap', 'PE_Ratio', 'Dividend_Yield'
+        ]], { origin: 'A2' });
 
         // Define merge ranges for grouped headers
         const merges = [
@@ -293,13 +310,16 @@ app.get('/api/export/excel', async (req, res) => {
                 if (!consolidatedSheet[cellAddress]) continue;
 
                 const cell = consolidatedSheet[cellAddress];
+                // Skip header rows (0 and 1 are the category and field name headers)
+                if (R < 2) continue;
+
                 // Large numbers (revenue, assets, etc.) - show as integers
                 if (typeof cell.v === 'number' && cell.v > 1000000) {
                     cell.z = '#,##0'; // Format with commas, no decimals
                     cell.t = 'n';
                 }
                 // Small numbers (ratios) - show with 4 decimal places
-                else if (typeof cell.v === 'number' && cell.v < 100 && cell.v > -100 && R > 1) {
+                else if (typeof cell.v === 'number' && cell.v < 100 && cell.v > -100) {
                     cell.z = '0.0000';
                     cell.t = 'n';
                 }
