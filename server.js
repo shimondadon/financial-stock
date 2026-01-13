@@ -130,7 +130,9 @@ app.get('/api/cache/:symbol/:reportType', async (req, res) => {
 // API endpoint to export all database data to Excel
 app.get('/api/export/excel', async (req, res) => {
     try {
-        console.log('📊 Starting Excel export of all database data...');
+        // Get years parameter from query string (default 20)
+        const yearsBack = parseInt(req.query.years) || 20;
+        console.log(`📊 Starting Excel export of all database data (last ${yearsBack} years)...`);
 
         // Check if using MongoDB (file cache doesn't support this feature)
         if (CACHE_TYPE !== 'mongodb') {
@@ -169,7 +171,7 @@ app.get('/api/export/excel', async (req, res) => {
 
         console.log(`📊 Processing ${Object.keys(dataBySymbol).length} unique symbols...`);
 
-        // Create consolidated data rows (one row per symbol)
+        // Create consolidated data rows (one row per symbol per year)
         const consolidatedRows = [];
 
         Object.keys(dataBySymbol).sort().forEach(symbol => {
@@ -183,70 +185,83 @@ app.get('/api/export/excel', async (req, res) => {
             const earningsData = symbolData.earnings || {};
             const overviewData = symbolData.overview || {};
 
-            // Get the most recent annual report data
-            const latestIncome = getLatestAnnualReport(incomeData);
-            const latestBalance = getLatestAnnualReport(balanceData);
-            const latestCashflow = getLatestAnnualReport(cashflowData);
+            // Get annual reports (up to yearsBack years)
+            const incomeReports = incomeData.annualReports || [];
+            const balanceReports = balanceData.annualReports || [];
+            const cashflowReports = cashflowData.annualReports || [];
+            const earningsReports = earningsData.annualEarnings || [];
 
-            // Build row with all metrics
-            const row = {
-                // Symbol
-                'Symbol': symbol,
-                'Year': latestIncome?.fiscalDateEnding?.substring(0, 4) || '',
+            // Determine how many years we actually have
+            const maxYears = Math.min(yearsBack, incomeReports.length, balanceReports.length, cashflowReports.length);
 
-                // Income Statement
-                'Total_Revenue': parseFloat(latestIncome?.totalRevenue) || 0,
-                'Gross_Profit': parseFloat(latestIncome?.grossProfit) || 0,
-                'Operating_Income': parseFloat(latestIncome?.operatingIncome) || 0,
-                'Net_Income': parseFloat(latestIncome?.netIncome) || 0,
-                'EBITDA': parseFloat(latestIncome?.ebitda) || 0,
-                'EPS': parseFloat(earningsData?.annualEarnings?.[0]?.reportedEPS) || 0,
+            // Create a row for each year
+            for (let i = 0; i < maxYears; i++) {
+                const incomeReport = incomeReports[i] || {};
+                const balanceReport = balanceReports[i] || {};
+                const cashflowReport = cashflowReports[i] || {};
+                const earningsReport = earningsReports[i] || {};
 
-                // Balance Sheet
-                'Total_Assets': parseFloat(latestBalance?.totalAssets) || 0,
-                'Current_Assets': parseFloat(latestBalance?.totalCurrentAssets) || 0,
-                'Total_Liabilities': parseFloat(latestBalance?.totalLiabilities) || 0,
-                'Current_Liabilities': parseFloat(latestBalance?.totalCurrentLiabilities) || 0,
-                'Long_Term_Debt': parseFloat(latestBalance?.longTermDebt) || 0,
-                'Shareholder_Equity': parseFloat(latestBalance?.totalShareholderEquity) || 0,
+                // Build row with all metrics for this year
+                const row = {
+                    // Symbol and Year
+                    'Symbol': symbol,
+                    'Year': incomeReport?.fiscalDateEnding?.substring(0, 4) || '',
 
-                // Cash Flow
-                'Cash_Equivalents': parseFloat(latestBalance?.cashAndCashEquivalentsAtCarryingValue) || 0,
-                'Operating_Cash_Flow': parseFloat(latestCashflow?.operatingCashflow) || 0,
-                'Capital_Expenditures': parseFloat(latestCashflow?.capitalExpenditures) || 0,
-                'Free_Cash_Flow': (parseFloat(latestCashflow?.operatingCashflow) || 0) - Math.abs(parseFloat(latestCashflow?.capitalExpenditures) || 0),
-                'Investing_Cash_Flow': parseFloat(latestCashflow?.cashflowFromInvestment) || 0,
-                'Financing_Cash_Flow': parseFloat(latestCashflow?.cashflowFromFinancing) || 0,
+                    // Income Statement
+                    'Total_Revenue': parseFloat(incomeReport?.totalRevenue) || 0,
+                    'Gross_Profit': parseFloat(incomeReport?.grossProfit) || 0,
+                    'Operating_Income': parseFloat(incomeReport?.operatingIncome) || 0,
+                    'Net_Income': parseFloat(incomeReport?.netIncome) || 0,
+                    'EBITDA': parseFloat(incomeReport?.ebitda) || 0,
+                    'EPS': parseFloat(earningsReport?.reportedEPS) || 0,
 
-                // Calculated Metrics
-                'Gross_Profit_Margin': calculateMetric(latestIncome?.grossProfit, latestIncome?.totalRevenue),
-                'Operating_Margin': calculateMetric(latestIncome?.operatingIncome, latestIncome?.totalRevenue),
-                'Net_Profit_Margin': calculateMetric(latestIncome?.netIncome, latestIncome?.totalRevenue),
-                'ROA': calculateMetric(latestIncome?.netIncome, latestBalance?.totalAssets),
-                'ROE': calculateMetric(latestIncome?.netIncome, latestBalance?.totalShareholderEquity),
-                'EBITDA_Margin': calculateMetric(latestIncome?.ebitda, latestIncome?.totalRevenue),
-                'Current_Ratio': calculateMetric(latestBalance?.totalCurrentAssets, latestBalance?.totalCurrentLiabilities),
-                'Quick_Ratio': calculateQuickRatio(latestBalance),
-                'Debt_to_Equity': calculateMetric(latestBalance?.longTermDebt, latestBalance?.totalShareholderEquity),
-                'Debt_to_Assets': calculateMetric(latestBalance?.totalLiabilities, latestBalance?.totalAssets),
-                'Asset_Turnover': calculateMetric(latestIncome?.totalRevenue, latestBalance?.totalAssets),
+                    // Balance Sheet
+                    'Total_Assets': parseFloat(balanceReport?.totalAssets) || 0,
+                    'Current_Assets': parseFloat(balanceReport?.totalCurrentAssets) || 0,
+                    'Total_Liabilities': parseFloat(balanceReport?.totalLiabilities) || 0,
+                    'Current_Liabilities': parseFloat(balanceReport?.totalCurrentLiabilities) || 0,
+                    'Long_Term_Debt': parseFloat(balanceReport?.longTermDebt) || 0,
+                    'Shareholder_Equity': parseFloat(balanceReport?.totalShareholderEquity) || 0,
 
-                // Growth Metrics (YoY)
-                'Revenue_Growth_YoY': calculateGrowth(incomeData, 'totalRevenue'),
-                'Net_Income_Growth_YoY': calculateGrowth(incomeData, 'netIncome'),
-                'EPS_Growth_YoY': calculateEPSGrowth(earningsData),
+                    // Cash Flow
+                    'Cash_Equivalents': parseFloat(balanceReport?.cashAndCashEquivalentsAtCarryingValue) || 0,
+                    'Operating_Cash_Flow': parseFloat(cashflowReport?.operatingCashflow) || 0,
+                    'Capital_Expenditures': parseFloat(cashflowReport?.capitalExpenditures) || 0,
+                    'Free_Cash_Flow': (parseFloat(cashflowReport?.operatingCashflow) || 0) - Math.abs(parseFloat(cashflowReport?.capitalExpenditures) || 0),
+                    'Investing_Cash_Flow': parseFloat(cashflowReport?.cashflowFromInvestment) || 0,
+                    'Financing_Cash_Flow': parseFloat(cashflowReport?.cashflowFromFinancing) || 0,
 
-                // Company Info
-                'Company_Name': overviewData?.Name || '',
-                'Sector': overviewData?.Sector || '',
-                'Industry': overviewData?.Industry || '',
-                'Market_Cap': parseFloat(overviewData?.MarketCapitalization) || 0,
-                'PE_Ratio': parseFloat(overviewData?.PERatio) || 0,
-                'Dividend_Yield': parseFloat(overviewData?.DividendYield) || 0
-            };
+                    // Calculated Metrics
+                    'Gross_Profit_Margin': calculateMetric(incomeReport?.grossProfit, incomeReport?.totalRevenue),
+                    'Operating_Margin': calculateMetric(incomeReport?.operatingIncome, incomeReport?.totalRevenue),
+                    'Net_Profit_Margin': calculateMetric(incomeReport?.netIncome, incomeReport?.totalRevenue),
+                    'ROA': calculateMetric(incomeReport?.netIncome, balanceReport?.totalAssets),
+                    'ROE': calculateMetric(incomeReport?.netIncome, balanceReport?.totalShareholderEquity),
+                    'EBITDA_Margin': calculateMetric(incomeReport?.ebitda, incomeReport?.totalRevenue),
+                    'Current_Ratio': calculateMetric(balanceReport?.totalCurrentAssets, balanceReport?.totalCurrentLiabilities),
+                    'Quick_Ratio': calculateQuickRatio(balanceReport),
+                    'Debt_to_Equity': calculateMetric(balanceReport?.longTermDebt, balanceReport?.totalShareholderEquity),
+                    'Debt_to_Assets': calculateMetric(balanceReport?.totalLiabilities, balanceReport?.totalAssets),
+                    'Asset_Turnover': calculateMetric(incomeReport?.totalRevenue, balanceReport?.totalAssets),
 
-            consolidatedRows.push(row);
-            console.log(`  ✓ Processed: ${symbol}`);
+                    // Growth Metrics (YoY) - only if we have previous year
+                    'Revenue_Growth_YoY': i < incomeReports.length - 1 ? calculateYearGrowth(incomeReports[i], incomeReports[i + 1], 'totalRevenue') : 0,
+                    'Net_Income_Growth_YoY': i < incomeReports.length - 1 ? calculateYearGrowth(incomeReports[i], incomeReports[i + 1], 'netIncome') : 0,
+                    'EPS_Growth_YoY': i < earningsReports.length - 1 ? calculateYearGrowth(earningsReports[i], earningsReports[i + 1], 'reportedEPS') : 0,
+
+                    // Company Info (same for all years)
+                    'Company_Name': overviewData?.Name || '',
+                    'Sector': overviewData?.Sector || '',
+                    'Industry': overviewData?.Industry || '',
+                    'Market_Cap': parseFloat(overviewData?.MarketCapitalization) || 0,
+                    'PE_Ratio': parseFloat(overviewData?.PERatio) || 0,
+                    'Dividend_Yield': parseFloat(overviewData?.DividendYield) || 0
+                };
+
+                consolidatedRows.push(row);
+            }
+
+            console.log(`  ✓ Processed: ${symbol} (${maxYears} years)`);
         });
 
         // Create the consolidated sheet - start data at row 3, skip automatic headers
@@ -394,6 +409,15 @@ function calculateGrowth(data, field) {
 
     const current = parseFloat(data.annualReports[0]?.[field]) || 0;
     const previous = parseFloat(data.annualReports[1]?.[field]) || 0;
+
+    if (previous === 0) return 0;
+    return (current - previous) / previous;
+}
+
+// Calculate year-over-year growth between two specific years
+function calculateYearGrowth(currentYear, previousYear, field) {
+    const current = parseFloat(currentYear?.[field]) || 0;
+    const previous = parseFloat(previousYear?.[field]) || 0;
 
     if (previous === 0) return 0;
     return (current - previous) / previous;

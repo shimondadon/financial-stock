@@ -561,6 +561,19 @@
             <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 0 0 15px 0; text-align: center;">
                 Download all financial data from the database as an Excel file
             </p>
+            <div style="text-align: center; margin-bottom: 15px;">
+                <label style="color: white; font-size: 14px; display: block; margin-bottom: 8px;">
+                    📅 Number of years back (default: 20)
+                </label>
+                <input
+                    type="number"
+                    id="yearsBackInput"
+                    min="1"
+                    max="30"
+                    value="20"
+                    style="width: 80px; padding: 8px; border-radius: 8px; border: 2px solid white; text-align: center; font-size: 16px; font-weight: bold;"
+                >
+            </div>
             <div style="text-align: center;">
                 <button onclick="exportToExcel()" class="download-json-btn" style="background: white; color: #667eea; font-weight: bold; width: auto; padding: 12px 30px;">
                     📥 Download Excel Export
@@ -1114,10 +1127,11 @@
 
         async function exportToExcel() {
             try {
-                showStatus('📊 Preparing Excel export...', 'info');
+                const yearsBack = parseInt(document.getElementById('yearsBackInput').value) || 20;
+                showStatus(`📊 Preparing Excel export (last ${yearsBack} years)...`, 'info');
 
-                // Call the export API
-                const response = await fetch('/api/export/excel');
+                // Call the export API with years parameter
+                const response = await fetch(`/api/export/excel?years=${yearsBack}`);
 
                 if (!response.ok) {
                     const errorData = await response.json();
