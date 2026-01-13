@@ -554,6 +554,19 @@
             <span onclick="setSymbol('CRM')">CRM</span>
             <span onclick="setSymbol('GOOGL')">GOOGL</span>
         </div>
+
+        <!-- Database Export Section -->
+        <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+            <h3 style="color: white; margin: 0 0 10px 0; text-align: center;">📊 Export All Database Data</h3>
+            <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 0 0 15px 0; text-align: center;">
+                Download all financial data from the database as an Excel file
+            </p>
+            <div style="text-align: center;">
+                <button onclick="exportToExcel()" class="download-json-btn" style="background: white; color: #667eea; font-weight: bold; width: auto; padding: 12px 30px;">
+                    📥 Download Excel Export
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Results Section -->
@@ -1085,6 +1098,52 @@
             document.body.removeChild(a);
 
             showStatus(`✅ Downloading ${reportType} report...`, 'success');
+        }
+
+        async function exportToExcel() {
+            try {
+                showStatus('📊 Preparing Excel export...', 'info');
+
+                // Call the export API
+                const response = await fetch('/api/export/excel');
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to export data');
+                }
+
+                // Get the blob from response
+                const blob = await response.blob();
+
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+
+                // Get filename from response header or use default
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `financial_data_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                showStatus('✅ Excel file downloaded successfully!', 'success');
+            } catch (error) {
+                console.error('Export error:', error);
+                showStatus(`❌ Export failed: ${error.message}`, 'error');
+            }
         }
 
         form.addEventListener('submit', async (e) => {

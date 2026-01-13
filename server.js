@@ -3,8 +3,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import os from 'os';
+import XLSX from 'xlsx';
 import { getFinancials, getApiLockStatus, getApiKeySetStatus } from './alphavantage_enhanced.js';
 import { connectDB, getFromCache, getCacheStats, CACHE_TYPE } from './cacheManager.js';
+import FinancialData from './models/FinancialData.js';
 
 // Load environment variables
 dotenv.config();
@@ -124,6 +126,271 @@ app.get('/api/cache/:symbol/:reportType', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// API endpoint to export all database data to Excel
+app.get('/api/export/excel', async (req, res) => {
+    try {
+        console.log('📊 Starting Excel export of all database data...');
+
+        // Check if using MongoDB (file cache doesn't support this feature)
+        if (CACHE_TYPE !== 'mongodb') {
+            return res.status(400).json({
+                success: false,
+                error: 'Excel export is only available when using MongoDB cache',
+                cacheType: CACHE_TYPE,
+                hint: 'Set CACHE_TYPE=mongodb in .env file'
+            });
+        }
+
+        // Get all financial data from MongoDB
+        const allData = await FinancialData.find({}).sort({ symbol: 1, reportType: 1 }).lean();
+
+        if (!allData || allData.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'No data found in database',
+                totalEntries: 0
+            });
+        }
+
+        console.log(`📋 Found ${allData.length} entries in database`);
+
+        // Create a new workbook
+        const workbook = XLSX.utils.book_new();
+
+        // Group data by symbol
+        const dataBySymbol = {};
+        allData.forEach(entry => {
+            if (!dataBySymbol[entry.symbol]) {
+                dataBySymbol[entry.symbol] = {};
+            }
+            dataBySymbol[entry.symbol][entry.reportType] = entry.data;
+        });
+
+        console.log(`📊 Processing ${Object.keys(dataBySymbol).length} unique symbols...`);
+
+        // Create consolidated data rows (one row per symbol)
+        const consolidatedRows = [];
+
+        Object.keys(dataBySymbol).sort().forEach(symbol => {
+            const symbolData = dataBySymbol[symbol];
+            console.log(`  📝 Processing symbol: ${symbol}...`);
+
+            // Extract data from different report types
+            const incomeData = symbolData.income || {};
+            const balanceData = symbolData.balance || {};
+            const cashflowData = symbolData.cashflow || {};
+            const earningsData = symbolData.earnings || {};
+            const overviewData = symbolData.overview || {};
+
+            // Get the most recent annual report data
+            const latestIncome = getLatestAnnualReport(incomeData);
+            const latestBalance = getLatestAnnualReport(balanceData);
+            const latestCashflow = getLatestAnnualReport(cashflowData);
+
+            // Build row with all metrics
+            const row = {
+                // Symbol
+                'Symbol': symbol,
+                'Year': latestIncome?.fiscalDateEnding?.substring(0, 4) || '',
+
+                // Income Statement
+                'Total_Revenue': parseFloat(latestIncome?.totalRevenue) || 0,
+                'Gross_Profit': parseFloat(latestIncome?.grossProfit) || 0,
+                'Operating_Income': parseFloat(latestIncome?.operatingIncome) || 0,
+                'Net_Income': parseFloat(latestIncome?.netIncome) || 0,
+                'EBITDA': parseFloat(latestIncome?.ebitda) || 0,
+                'EPS': parseFloat(earningsData?.annualEarnings?.[0]?.reportedEPS) || 0,
+
+                // Balance Sheet
+                'Total_Assets': parseFloat(latestBalance?.totalAssets) || 0,
+                'Current_Assets': parseFloat(latestBalance?.totalCurrentAssets) || 0,
+                'Total_Liabilities': parseFloat(latestBalance?.totalLiabilities) || 0,
+                'Current_Liabilities': parseFloat(latestBalance?.totalCurrentLiabilities) || 0,
+                'Long_Term_Debt': parseFloat(latestBalance?.longTermDebt) || 0,
+                'Shareholder_Equity': parseFloat(latestBalance?.totalShareholderEquity) || 0,
+
+                // Cash Flow
+                'Cash_Equivalents': parseFloat(latestBalance?.cashAndCashEquivalentsAtCarryingValue) || 0,
+                'Operating_Cash_Flow': parseFloat(latestCashflow?.operatingCashflow) || 0,
+                'Capital_Expenditures': parseFloat(latestCashflow?.capitalExpenditures) || 0,
+                'Free_Cash_Flow': (parseFloat(latestCashflow?.operatingCashflow) || 0) - Math.abs(parseFloat(latestCashflow?.capitalExpenditures) || 0),
+                'Investing_Cash_Flow': parseFloat(latestCashflow?.cashflowFromInvestment) || 0,
+                'Financing_Cash_Flow': parseFloat(latestCashflow?.cashflowFromFinancing) || 0,
+
+                // Calculated Metrics
+                'Gross_Profit_Margin': calculateMetric(latestIncome?.grossProfit, latestIncome?.totalRevenue),
+                'Operating_Margin': calculateMetric(latestIncome?.operatingIncome, latestIncome?.totalRevenue),
+                'Net_Profit_Margin': calculateMetric(latestIncome?.netIncome, latestIncome?.totalRevenue),
+                'ROA': calculateMetric(latestIncome?.netIncome, latestBalance?.totalAssets),
+                'ROE': calculateMetric(latestIncome?.netIncome, latestBalance?.totalShareholderEquity),
+                'EBITDA_Margin': calculateMetric(latestIncome?.ebitda, latestIncome?.totalRevenue),
+                'Current_Ratio': calculateMetric(latestBalance?.totalCurrentAssets, latestBalance?.totalCurrentLiabilities),
+                'Quick_Ratio': calculateQuickRatio(latestBalance),
+                'Debt_to_Equity': calculateMetric(latestBalance?.longTermDebt, latestBalance?.totalShareholderEquity),
+                'Debt_to_Assets': calculateMetric(latestBalance?.totalLiabilities, latestBalance?.totalAssets),
+                'Asset_Turnover': calculateMetric(latestIncome?.totalRevenue, latestBalance?.totalAssets),
+
+                // Growth Metrics (YoY)
+                'Revenue_Growth_YoY': calculateGrowth(incomeData, 'totalRevenue'),
+                'Net_Income_Growth_YoY': calculateGrowth(incomeData, 'netIncome'),
+                'EPS_Growth_YoY': calculateEPSGrowth(earningsData),
+
+                // Company Info
+                'Company_Name': overviewData?.Name || '',
+                'Sector': overviewData?.Sector || '',
+                'Industry': overviewData?.Industry || '',
+                'Market_Cap': parseFloat(overviewData?.MarketCapitalization) || 0,
+                'PE_Ratio': parseFloat(overviewData?.PERatio) || 0,
+                'Dividend_Yield': parseFloat(overviewData?.DividendYield) || 0
+            };
+
+            consolidatedRows.push(row);
+            console.log(`  ✓ Processed: ${symbol}`);
+        });
+
+        // Create the consolidated sheet
+        const consolidatedSheet = XLSX.utils.json_to_sheet(consolidatedRows);
+
+        // Insert grouped headers at the top
+        XLSX.utils.sheet_add_aoa(consolidatedSheet, [[
+            '', '', // Empty for Symbol, Year columns
+            'Income Statement', '', '', '', '', '', // Spans 6 columns (C-H)
+            'Balance Sheet', '', '', '', '', '', // Spans 6 columns (I-N)
+            'Cash Flow', '', '', '', '', '', // Spans 6 columns (O-T)
+            'Metrics', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // Spans 15 columns (U-AI)
+            'Company Info', '', '', '', '', '' // Spans 6 columns (AJ-AO)
+        ]], { origin: 'A1' });
+
+        // Define merge ranges for grouped headers
+        const merges = [
+            // Income Statement: C1:H1
+            { s: { r: 0, c: 2 }, e: { r: 0, c: 7 } },
+            // Balance Sheet: I1:N1
+            { s: { r: 0, c: 8 }, e: { r: 0, c: 13 } },
+            // Cash Flow: O1:T1
+            { s: { r: 0, c: 14 }, e: { r: 0, c: 19 } },
+            // Metrics: U1:AI1
+            { s: { r: 0, c: 20 }, e: { r: 0, c: 34 } },
+            // Company Info: AJ1:AO1
+            { s: { r: 0, c: 35 }, e: { r: 0, c: 40 } }
+        ];
+
+        consolidatedSheet['!merges'] = merges;
+
+        // Set column widths
+        const colWidths = [];
+        for (let i = 0; i < 41; i++) {
+            colWidths.push({ wch: 18 }); // Width for all columns
+        }
+        consolidatedSheet['!cols'] = colWidths;
+
+        // Fix number formatting - prevent scientific notation
+        const range = XLSX.utils.decode_range(consolidatedSheet['!ref']);
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                if (!consolidatedSheet[cellAddress]) continue;
+
+                const cell = consolidatedSheet[cellAddress];
+                // Large numbers (revenue, assets, etc.) - show as integers
+                if (typeof cell.v === 'number' && cell.v > 1000000) {
+                    cell.z = '#,##0'; // Format with commas, no decimals
+                    cell.t = 'n';
+                }
+                // Small numbers (ratios) - show with 4 decimal places
+                else if (typeof cell.v === 'number' && cell.v < 100 && cell.v > -100 && R > 1) {
+                    cell.z = '0.0000';
+                    cell.t = 'n';
+                }
+            }
+        }
+
+        XLSX.utils.book_append_sheet(workbook, consolidatedSheet, 'Financial_Data');
+
+        // Generate Excel file buffer
+        const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        // Set response headers for file download
+        const filename = `financial_data_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Length', excelBuffer.length);
+
+        // Send the file
+        res.send(excelBuffer);
+
+        console.log(`✅ Successfully exported ${allData.length} entries to Excel file: ${filename}\n`);
+
+    } catch (error) {
+        console.error('❌ Excel export error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to export data to Excel'
+        });
+    }
+});
+
+// Helper functions for Excel export
+
+// Get latest annual report from financial data
+function getLatestAnnualReport(data) {
+    if (!data) return null;
+
+    // Check if data has annualReports array
+    if (data.annualReports && Array.isArray(data.annualReports) && data.annualReports.length > 0) {
+        return data.annualReports[0]; // Most recent is first
+    }
+
+    return null;
+}
+
+// Calculate a metric (division with safety)
+function calculateMetric(numerator, denominator) {
+    const num = parseFloat(numerator) || 0;
+    const den = parseFloat(denominator) || 0;
+
+    if (den === 0) return 0;
+    return num / den;
+}
+
+// Calculate quick ratio
+function calculateQuickRatio(balanceData) {
+    if (!balanceData) return 0;
+
+    const currentAssets = parseFloat(balanceData.totalCurrentAssets) || 0;
+    const inventory = parseFloat(balanceData.inventory) || 0;
+    const currentLiabilities = parseFloat(balanceData.totalCurrentLiabilities) || 0;
+
+    if (currentLiabilities === 0) return 0;
+    return (currentAssets - inventory) / currentLiabilities;
+}
+
+// Calculate year-over-year growth
+function calculateGrowth(data, field) {
+    if (!data || !data.annualReports || data.annualReports.length < 2) {
+        return 0;
+    }
+
+    const current = parseFloat(data.annualReports[0]?.[field]) || 0;
+    const previous = parseFloat(data.annualReports[1]?.[field]) || 0;
+
+    if (previous === 0) return 0;
+    return (current - previous) / previous;
+}
+
+// Calculate EPS growth
+function calculateEPSGrowth(earningsData) {
+    if (!earningsData || !earningsData.annualEarnings || earningsData.annualEarnings.length < 2) {
+        return 0;
+    }
+
+    const current = parseFloat(earningsData.annualEarnings[0]?.reportedEPS) || 0;
+    const previous = parseFloat(earningsData.annualEarnings[1]?.reportedEPS) || 0;
+
+    if (previous === 0) return 0;
+    return (current - previous) / previous;
+}
 
 // API endpoint to check API lock status
 app.get('/api/status', (req, res) => {
