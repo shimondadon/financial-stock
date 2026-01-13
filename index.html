@@ -1151,7 +1151,7 @@
                 let filename = `financial_data_export_${new Date().toISOString().split('T')[0]}.xlsx`;
 
                 if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+                    const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
                     if (filenameMatch) {
                         filename = filenameMatch[1];
                     }
