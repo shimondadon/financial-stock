@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import os from 'os';
-import { getFinancials, getApiLockStatus } from './alphavantage_enhanced.js';
+import { getFinancials, getApiLockStatus, getApiKeySetStatus } from './alphavantage_enhanced.js';
 import { connectDB, getFromCache, getCacheStats, CACHE_TYPE } from './cacheManager.js';
 
 // Load environment variables
@@ -129,6 +129,8 @@ app.get('/api/cache/:symbol/:reportType', async (req, res) => {
 app.get('/api/status', (req, res) => {
     try {
         const status = getApiLockStatus();
+        const keySetStatus = getApiKeySetStatus();
+
         res.json({
             success: true,
             api: {
@@ -138,6 +140,13 @@ app.get('/api/status', (req, res) => {
                 queuedSymbols: status.queuedSymbols,
                 cooldownRemaining: Math.ceil(status.cooldownRemaining / 1000), // seconds
                 available: !status.isLocked && status.cooldownRemaining === 0
+            },
+            apiKeys: {
+                currentSet: keySetStatus.currentSet,
+                setAKeys: keySetStatus.setAKeys,
+                setBKeys: keySetStatus.setBKeys,
+                switchCount: keySetStatus.switchCount,
+                totalKeys: keySetStatus.totalKeysAvailable
             },
             timestamp: new Date().toISOString()
         });

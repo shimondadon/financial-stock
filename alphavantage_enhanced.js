@@ -4,13 +4,91 @@ import { saveToCache, getFromCache } from './cacheManager.js';
 // ========================================
 // הגדרות גלובליות
 // ========================================
-const API_KEY1 = 'TT0O07L0Y7DO2PHV'; // ה-API key שלך
-const API_KEY2 = 'WCP77UX1RF7O4MSG'; // ה-API key שלך
-const API_KEY3 = 'XAN8JQ0KV40DRKUO'; // ה-API key שלך
-const API_KEY4 = '73DEDQ2T9NQD96QG'; // ה-API key שלך
-const API_KEY5 = 'MZCCU2PIV56DC6RB'; // ה-API key שלך
-const API_KEY6 = 'OZU0A7HK5EN21J13'; // ה-API key שלך
+
+// סט A - מפתחות API ראשי (5 מפתחות)
+const API_KEYS_SET_A = [
+    'TT0O07L0Y7DO2PHV',
+    'WCP77UX1RF7O4MSG',
+    'XAN8JQ0KV40DRKUO',
+    '73DEDQ2T9NQD96QG',
+    'MZCCU2PIV56DC6RB'
+];
+
+// סט B - מפתחות API גיבוי (5 מפתחות)
+const API_KEYS_SET_B = [
+    'OZU0A7HK5EN21J13',
+    'VD6SE0D30YSRUL3G',
+    '1E4Q7KAMMGXZGWI4',
+    'LWYTO43XX5TH4LQ0',
+    '6P6D12B4ZFCOT550'
+];
+
+// מפתח רזרבי נוסף (אופציונלי)
+const API_KEY_RESERVE = 'UX624YT2RK2EMVMU';
+
 const BASE_URL = 'https://www.alphavantage.co/query';
+
+// מעקב אחר הסט הנוכחי
+let currentApiKeySet = 'A'; // 'A' or 'B'
+let apiKeySwitchCount = 0;
+
+/**
+ * קבלת הסט הנוכחי של מפתחות API
+ */
+function getCurrentApiKeySet() {
+    return currentApiKeySet === 'A' ? API_KEYS_SET_A : API_KEYS_SET_B;
+}
+
+/**
+ * החלפת סט מפתחות API
+ */
+function switchApiKeySet() {
+    const oldSet = currentApiKeySet;
+    currentApiKeySet = currentApiKeySet === 'A' ? 'B' : 'A';
+    apiKeySwitchCount++;
+
+    console.log(`\n⚠️ ========================================`);
+    console.log(`🔄 SWITCHING API KEY SET: ${oldSet} → ${currentApiKeySet}`);
+    console.log(`📊 Switch count: ${apiKeySwitchCount}`);
+    console.log(`🔑 Now using ${getCurrentApiKeySet().length} keys from Set ${currentApiKeySet}`);
+    console.log(`⚠️ ========================================\n`);
+
+    return currentApiKeySet;
+}
+
+/**
+ * בדיקה האם התגובה מציינת שגיאת מכסה יומית
+ */
+function isRateLimitError(data) {
+    if (!data) return false;
+
+    const dataString = typeof data === 'string' ? data : JSON.stringify(data);
+
+    // בדיקת מספר דפוסי שגיאה
+    const errorPatterns = [
+        'limit is 25 requests per day',
+        'Thank you for using Alpha Vantage',
+        'Our standard API rate limit',
+        'premium plan',
+        'rate limit'
+    ];
+
+    return errorPatterns.some(pattern =>
+        dataString.toLowerCase().includes(pattern.toLowerCase())
+    );
+}
+
+/**
+ * קבלת המפתח הבא מהסט הנוכחי (rotation)
+ * @param {number} keyIndex - האינדקס הנוכחי במערך המפתחות
+ * @returns {Object} - אובייקט עם המפתח והאינדקס החדש
+ */
+function getNextApiKey(keyIndex) {
+    const keySet = getCurrentApiKeySet();
+    const key = keySet[keyIndex % keySet.length];
+    const newIndex = keyIndex + 1;
+    return { key, newIndex };
+}
 
 // ========================================
 // מנגנון נעילה למניעת קריאות API מקבילות
@@ -182,66 +260,99 @@ async function saveDataToCache(symbol, rawData) {
 // ========================================
 
 /**
- * משיכת כל הנתונים הפיננסיים מ-Alpha Vantage API
+ * פונקציה כללית לקריאת API עם טיפול בשגיאות והחלפת סטים
+ * @param {string} functionName - שם הפונקציה ב-API
  * @param {string} symbol - סימבול המניה
+ * @param {string} reportName - שם הדוח לתצוגה
+ * @param {number} keyIndex - האינדקס הנוכחי במערך המפתחות
+ * @returns {Promise<Object>} - אובייקט עם הנתונים והאינדקס החדש
+ */
+async function fetchApiData(functionName, symbol, reportName, keyIndex) {
+    console.log(`Fetching ${reportName}...`);
+
+    const { key, newIndex } = getNextApiKey(keyIndex);
+
+    const response = await fetch(
+        `${BASE_URL}?function=${functionName}&symbol=${symbol}&apikey=${key}`
+    );
+    const data = await response.json();
+
+    // בדיקת שגיאת מכסה
+    if (isRateLimitError(data)) {
+        console.error(`❌ Rate limit error detected in ${reportName}!`);
+        throw new Error(`RATE_LIMIT:${reportName}`);
+    }
+
+    return { data, newIndex };
+}
+
+/**
+ * משיכת כל הנתונים הפיננסיים מ-Alpha Vantage API
+ * עם תמיכה בהחלפת סט מפתחות אוטומטית במקרה של שגיאת מכסה
+ * @param {string} symbol - סימבול המניה
+ * @param {boolean} isRetry - האם זו ניסיון חוזר אחרי החלפת סט
  * @returns {Promise<Object>} - אובייקט עם כל הנתונים הגולמיים
  */
-async function fetchAllFinancialData(symbol) {
+async function fetchAllFinancialData(symbol, isRetry = false) {
     // המתנה עד שה-API זמין
     await waitForApiAvailability(symbol);
 
     try {
         console.log(`🚀 Starting API fetch for ${symbol}...`);
+        console.log(`🔑 Using API Key Set: ${currentApiKeySet}`);
         console.log(`⏱️ Estimated time: ~65 seconds (5 API calls with 13s delays)`);
 
-        // קבלת Income Statement
-        console.log('Fetching Income Statement...', `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY2}`);
-        const incomeResponse = await fetch(
-            `${BASE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${API_KEY6}`
-        );
-        const incomeData = await incomeResponse.json();
-        await delay(13000);
+        // מערך של כל הקריאות שצריך לבצע
+        const apiCalls = [
+            { function: 'INCOME_STATEMENT', name: 'Income Statement', delay: 0 },
+            { function: 'BALANCE_SHEET', name: 'Balance Sheet', delay: 0 },
+            { function: 'CASH_FLOW', name: 'Cash Flow', delay: 0 },
+            { function: 'EARNINGS', name: 'Earnings', delay: 0 },
+            { function: 'OVERVIEW', name: 'Company Overview', delay: 0 }
+        ];
 
-        // קבלת Balance Sheet
-        console.log('Fetching Balance Sheet...');
-    const balanceResponse = await fetch(
-        `${BASE_URL}?function=BALANCE_SHEET&symbol=${symbol}&apikey=${API_KEY2}`
-    );
-    const balanceData = await balanceResponse.json();
-    await delay(13000);
+        const results = {};
+        const resultKeys = ['incomeData', 'balanceData', 'cashFlowData', 'earningsData', 'overviewData'];
 
-    // קבלת Cash Flow
-    console.log('Fetching Cash Flow...');
-    const cashFlowResponse = await fetch(
-        `${BASE_URL}?function=CASH_FLOW&symbol=${symbol}&apikey=${API_KEY3}`
-    );
-    const cashFlowData = await cashFlowResponse.json();
-    await delay(13000);
+        // מונה מפתחות מקומי - מתחיל מ-0 לכל משיכת סימבול!
+        let localKeyIndex = 0;
 
-    // קבלת Earnings
-    console.log('Fetching Earnings...');
-    const earningsResponse = await fetch(
-        `${BASE_URL}?function=EARNINGS&symbol=${symbol}&apikey=${API_KEY4}`
-    );
-    const earningsData = await earningsResponse.json();
-    await delay(13000);
+        // ביצוע כל הקריאות ברצף
+        for (let i = 0; i < apiCalls.length; i++) {
+            const call = apiCalls[i];
 
-        // קבלת Company Overview
-        console.log('Fetching Company Overview...');
-        const overviewResponse = await fetch(
-            `${BASE_URL}?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY5}`
-        );
-        const overviewData = await overviewResponse.json();
+            try {
+                const result = await fetchApiData(call.function, symbol, call.name, localKeyIndex);
+                results[resultKeys[i]] = result.data;
+                localKeyIndex = result.newIndex; // עדכון האינדקס
 
-        console.log(`✅ Successfully fetched all data for ${symbol}`);
+                // המתנה בין קריאות (מלבד האחרונה)
+                if (call.delay > 0) {
+                    await delay(call.delay);
+                }
+            } catch (error) {
+                // אם זו שגיאת rate limit ולא ניסיון חוזר
+                if (error.message.startsWith('RATE_LIMIT:') && !isRetry) {
+                    console.log(`🔄 Switching to Set ${currentApiKeySet === 'A' ? 'B' : 'A'}...`);
+                    switchApiKeySet();
+                    releaseApiLock();
+                    return await fetchAllFinancialData(symbol, true);
+                }
 
-        return {
-            incomeData,
-            balanceData,
-            cashFlowData,
-            earningsData,
-            overviewData
-        };
+                // אם זו שגיאת rate limit וזה כבר ניסיון חוזר
+                if (error.message.startsWith('RATE_LIMIT:') && isRetry) {
+                    throw new Error('Rate limit exceeded on both API key sets. Please try again tomorrow.');
+                }
+
+                // שגיאה אחרת - זרוק הלאה
+                throw error;
+            }
+        }
+
+        console.log(`✅ Successfully fetched all data for ${symbol} using Set ${currentApiKeySet}`);
+
+        return results;
+
     } catch (error) {
         console.error(`❌ Error fetching data for ${symbol}:`, error.message);
         throw error;
@@ -780,6 +891,17 @@ export function getApiLockStatus() {
         cooldownRemaining: lastApiCallEndTime
             ? Math.max(0, API_COOLDOWN_MS - (Date.now() - lastApiCallEndTime))
             : 0
+    };
+}
+
+// Export API key set status
+export function getApiKeySetStatus() {
+    return {
+        currentSet: currentApiKeySet,
+        setAKeys: API_KEYS_SET_A.length,
+        setBKeys: API_KEYS_SET_B.length,
+        switchCount: apiKeySwitchCount,
+        totalKeysAvailable: API_KEYS_SET_A.length + API_KEYS_SET_B.length
     };
 }
 
